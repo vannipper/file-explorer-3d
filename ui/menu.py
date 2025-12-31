@@ -48,6 +48,8 @@ class Menu:
                    display_percent=True)
         ]
 
+        self._text_cache = {}
+
     def _on_slider_change(self, key, value):
         """Callback when a slider changes — update config immediately."""
         self.config.set(key, value)
@@ -65,7 +67,25 @@ class Menu:
             pygame.event.set_grab(True)
             self.config.save()
 
-    def handle_input(self):
+    def render_text_to_texture(self, text, color, font):
+        """Render text to a texture and return texture ID and dimensions. Uses cache."""
+        key = (text, color, getattr(font, 'name', None), getattr(font, 'size', None))
+        if key in self._text_cache:
+            return self._text_cache[key]
+        text_surface = font.render(text, True, color)
+        text_data = pygame.image.tostring(text_surface, "RGBA", True)
+
+        texture_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, text_surface.get_width(),
+                     text_surface.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+
+        self._text_cache[key] = (texture_id, text_surface.get_width(), text_surface.get_height())
+        return self._text_cache[key]
+
+    def handle_input(self, events):
         """
         Handle menu input (keyboard and mouse).
         Returns True if user selected Exit.
@@ -74,11 +94,10 @@ class Menu:
             return False
 
         # Forward events to sliders first (they may start/stop dragging)
-        for event in pygame.event.get():
+        for event in events:
             # allow sliders to process events
             for s in self.sliders:
                 if s.handle_event(event):
-                    # slider handled event that requires no further processing
                     pass
 
             if event.type == QUIT:
@@ -102,13 +121,12 @@ class Menu:
                         break
             elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click -> if over an option, select it
-                    # check options
                     mouse_x, mouse_y = event.pos
                     for i, rect in enumerate(self.option_rects):
                         if rect.collidepoint(mouse_x, mouse_y):
                             self.selected_option = i
                             return self.select_option()
-                    # otherwise clicks on slider handled by slider.handle_event above
+                    # otherwise clicks on slider handled above
 
         return False
 
@@ -130,20 +148,6 @@ class Menu:
                 self.on_toggle_fullscreen(new_val)
 
         return False
-
-    def render_text_to_texture(self, text, color, font):
-        """Render text to a texture and return texture ID and dimensions."""
-        text_surface = font.render(text, True, color)
-        text_data = pygame.image.tostring(text_surface, "RGBA", True)
-
-        texture_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, texture_id)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, text_surface.get_width(),
-                     text_surface.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
-
-        return texture_id, text_surface.get_width(), text_surface.get_height()
 
     def draw_text_quad(self, x, y, width, height, texture_id):
         """Draw a textured quad for text."""
@@ -181,12 +185,12 @@ class Menu:
         ]
 
         # Render debug text using texture rendering
-        y_pos = 20
+        y_pos = 30
+
         for line in debug_lines:
             tex, w, h = self.render_text_to_texture(line, (100, 200, 255), self.small_font)
             glColor4f(1, 1, 1, 1)
             self.draw_text_quad(10, y_pos, w, h, tex)
-            glDeleteTextures([tex])
             y_pos += 30
 
         glDisable(GL_BLEND)
@@ -240,7 +244,7 @@ class Menu:
         title_tex, title_w, title_h = self.render_text_to_texture("SETTINGS", (255, 200, 100), self.font)
         glColor4f(1, 1, 1, 1)
         self.draw_text_quad(50, 50, title_w, title_h, title_tex)
-        glDeleteTextures([title_tex])
+        # do not delete cached texture
 
         # Clear option rects for this frame
         self.option_rects = []
@@ -265,11 +269,9 @@ class Menu:
             # position option x relative to window width (left margin of 5% of width)
             x_pos = int(win_w * 0.05)
             self.draw_text_quad(x_pos, y_offset, option_w, option_h, option_tex)
-
-            # Store rect for mouse collision detection (approximate)
+            # store option rect
             self.option_rects.append(pygame.Rect(x_pos, y_offset, option_w, option_h))
-
-            glDeleteTextures([option_tex])
+            # do not delete cached texture
             y_offset += int(win_h * 0.06)
 
         # After drawing options, draw sliders on the right side at their own positions

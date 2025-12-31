@@ -17,7 +17,7 @@ class Player:
     def position(self, camera):
         return (camera.x, camera.y, camera.z)
 
-    def handle_input(self, menu=None):
+    def handle_input(self, events, menu=None):
         """
         Process keyboard and mouse input.
         Returns forward and right movement values, or (None, None) if should quit.
@@ -33,7 +33,7 @@ class Player:
             self.mouse_sensitivity = self.base_mouse_sensitivity * float(ms_mult)
             self.camera.move_speed = self.base_move_speed * float(mv_mult)
 
-        for event in pygame.event.get():
+        for event in events:
             if event.type == QUIT:
                 return None, None
             if event.type == KEYDOWN:

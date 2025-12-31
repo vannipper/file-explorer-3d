@@ -4,5 +4,6 @@
   "show_grid": true,
   "show_axes": true,
   "fov": 70,
-  "start_fullscreen": false
+  "start_fullscreen": false,
+  "debug_info": false
 }
