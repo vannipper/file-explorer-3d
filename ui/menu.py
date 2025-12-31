@@ -17,6 +17,7 @@ class Menu:
         self.options = [
             ("Show Grid", "show_grid"),
             ("Show Axes", "show_axes"),
+            ("Debug Info", "debug_info"),
             ("Start Fullscreen", "start_fullscreen"),
             ("Exit", None),
         ]
@@ -154,6 +155,50 @@ class Menu:
         glTexCoord2f(0, 0); glVertex2f(x, y + height)
         glEnd()
 
+    def draw_debug_info(self, player_pos, fps, win_w, win_h):
+        """Draw debug overlay with FPS and player position."""
+        if not self.config.get("debug_info", False) or self.active:
+            return
+
+        # Switch to 2D projection for debug text
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        glOrtho(0, win_w, win_h, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+
+        glDisable(GL_DEPTH_TEST)
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        # Prepare debug text
+        debug_lines = [
+            f"FPS: {fps:.1f}",
+            f"Pos: ({player_pos[0]:.2f}, {player_pos[1]:.2f}, {player_pos[2]:.2f})",
+        ]
+
+        # Render debug text using texture rendering
+        y_pos = 20
+        for line in debug_lines:
+            tex, w, h = self.render_text_to_texture(line, (100, 200, 255), self.small_font)
+            glColor4f(1, 1, 1, 1)
+            self.draw_text_quad(10, y_pos, w, h, tex)
+            glDeleteTextures([tex])
+            y_pos += 30
+
+        glDisable(GL_BLEND)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_DEPTH_TEST)
+
+        # Restore 3D projection
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+        glPopMatrix()
+
     def draw(self):
         """Draw the menu using OpenGL."""
         if not self.active:
@@ -227,11 +272,10 @@ class Menu:
             glDeleteTextures([option_tex])
             y_offset += int(win_h * 0.06)
 
-        # After drawing options, draw sliders (position them under options)
-        # move sliders further right to avoid overlapping labels
-        slider_x = int(win_w * 0.15)
-        slider_y = y_offset + 10
-        slider_w = int(win_w * 0.65)
+        # After drawing options, draw sliders on the right side at their own positions
+        slider_x = int(win_w * 0.4)
+        slider_y = int(win_h * 0.2)
+        slider_w = int(win_w * 0.5)
         for s in self.sliders:
             s.draw(slider_x, slider_y, slider_w, self.small_font)
             slider_y += int(win_h * 0.08)

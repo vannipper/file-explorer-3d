@@ -14,6 +14,9 @@ class Player:
         self.mouse_sensitivity = self.base_mouse_sensitivity
         self.fullscreen_toggle = fullscreen_toggle
 
+    def position(self, camera):
+        return (camera.x, camera.y, camera.z)
+
     def handle_input(self, menu=None):
         """
         Process keyboard and mouse input.

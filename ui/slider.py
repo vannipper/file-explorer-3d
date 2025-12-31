@@ -5,7 +5,7 @@ from OpenGL.GL import *
 class Slider:
     """Simple horizontal slider rendered with OpenGL textures for labels."""
 
-    def __init__(self, label, key=None, min_value=0.0, max_value=1.0, value=0.0, on_change=None, font=None, display_percent=False):
+    def __init__(self, label, key=None, min_value=0.0, max_value=1.0, value=0.0, on_change=None, font=None, display_percent=False, min_percent=1, max_percent=400):
         self.label = label
         self.key = key
         self.min = min_value
@@ -16,6 +16,8 @@ class Slider:
         self.dragging = False
         self.rect = pygame.Rect(0, 0, 0, 0)  # will be set in draw
         self.display_percent = display_percent
+        self.min_percent = min_percent
+        self.max_percent = max_percent
 
     def _value_to_pos(self, x, width):
         """Convert current value to knob x position."""
@@ -30,12 +32,13 @@ class Slider:
 
     def handle_event(self, event):
         """Handle pygame events for dragging. Returns True if handled."""
+        label_width = 400
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
             if self.rect.collidepoint(mx, my):
                 self.dragging = True
                 # update immediately
-                new_val = self._pos_to_value(mx, self.rect.x + 80, self.rect.width - 100)
+                new_val = self._pos_to_value(mx, self.rect.x + label_width, self.rect.width - label_width - 80)
                 self.set_value(new_val)
                 return True
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
@@ -45,7 +48,7 @@ class Slider:
         elif event.type == pygame.MOUSEMOTION:
             if self.dragging:
                 mx, my = event.pos
-                new_val = self._pos_to_value(mx, self.rect.x + 80, self.rect.width - 100)
+                new_val = self._pos_to_value(mx, self.rect.x + label_width, self.rect.width - label_width - 80)
                 self.set_value(new_val)
                 return True
         return False
@@ -74,31 +77,22 @@ class Slider:
 
     def draw(self, x, y, width, font):
         """Draw slider at given position. x,y are top-left, width is full slider width."""
-        # store rect for interaction (includes label area)
+        # Fixed label width of 400 pixels
+        label_width = 400
+        
+        # store rect for interaction (includes label and slider area)
         self.rect = pygame.Rect(x, y, width, 32)
 
-        # draw label text on left
+        # draw label text on left (fixed 400 pixel width)
         label_tex, lw, lh = self.render_text_to_texture(self.label, (220, 220, 220), font)
         glColor4f(1, 1, 1, 1)
         self._draw_textured_quad(x, y, lw, lh, label_tex)
         glDeleteTextures([label_tex])
 
-        # draw value text on right (display as percentage if requested)
-        if self.display_percent:
-            # clamp for display (1%..400%)
-            display_val = int(max(1, min(400, round(self.value * 100))))
-            val_text = f"{display_val}%"
-        else:
-            val_text = f"{self.value:.2f}"
-
-        val_tex, vw, vh = self.render_text_to_texture(val_text, (255, 255, 150), font)
-        self._draw_textured_quad(x + width - vw, y, vw, vh, val_tex)
-        glDeleteTextures([val_tex])
-
-        # draw bar (between label and value) - horizontal
-        bar_x = x + 80
+        # slider bar starts after the label
+        bar_x = x + label_width
         bar_y = y + 16
-        bar_w = width - 100
+        bar_w = width - label_width - 80  # leave space for value on right
         bar_h = 6
 
         # background bar
@@ -131,6 +125,21 @@ class Slider:
             ang = a * 3.14159 / 180.0
             glVertex2f(knob_x + knob_r * __import__('math').cos(ang), bar_y + knob_r * __import__('math').sin(ang))
         glEnd()
+
+        # draw value text on right (display as percentage if requested)
+        if self.display_percent:
+            # clamp for display based on min/max percent
+            display_val = int(max(self.min_percent, min(self.max_percent, round(self.value * 100))))
+            val_text = f"{display_val}%"
+        else:
+            val_text = f"{self.value:.2f}"
+
+        val_tex, vw, vh = self.render_text_to_texture(val_text, (255, 255, 150), font)
+        # position with margin after slider bar, vertically centered with bar
+        val_x = bar_x + bar_w + 10  # 10 pixel margin
+        val_y = bar_y - vh / 2  # vertically center with bar
+        self._draw_textured_quad(val_x, val_y, vw, vh, val_tex)
+        glDeleteTextures([val_tex])
 
     def _draw_textured_quad(self, x, y, w, h, texture_id):
         glEnable(GL_TEXTURE_2D)

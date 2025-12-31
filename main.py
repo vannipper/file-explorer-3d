@@ -101,6 +101,7 @@ if __name__ == "__main__":
 	running = True
 	while running:
 		dt = clock.tick(60) / 1000.0
+		fps = clock.get_fps()
 
 		if menu.active:
 			pygame.event.set_grab(False)
@@ -128,6 +129,12 @@ if __name__ == "__main__":
 		
 		# draw menu (menu will query the actual display size itself)
 		menu.draw()
+
+		# draw debug info if enabled
+		surf = pygame.display.get_surface()
+		if surf:
+			win_w, win_h = surf.get_size()
+			menu.draw_debug_info(player.position(player.camera), fps, win_w, win_h)
 
 		pygame.display.flip()
 
