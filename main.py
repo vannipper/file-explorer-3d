@@ -12,6 +12,112 @@ from editor.gizmo import Gizmo
 from obj.player import Player
 from obj.rectangular_prism import RectangularPrism
 from obj.world import World
+from utils.file_manager import FileManager
+from initializer import EngineInitializer
+
+# Global state for change tracking
+has_unsaved_changes = False
+
+def update_window_title(file_path=None):
+    """Updates the window title with project name and unsaved changes indicator."""
+    global has_unsaved_changes
+    base_title = "Zenith Engine"
+    project_name = os.path.basename(file_path) if file_path else "Untitled Project"
+    asterisk = "*" if has_unsaved_changes else ""
+    pygame.display.set_caption(f"{base_title} - {project_name}{asterisk}")
+
+def mark_changes():
+    """Sets the dirty flag and updates the title."""
+    global has_unsaved_changes
+    if not has_unsaved_changes:
+        has_unsaved_changes = True
+
+def get_world_data(world):
+    return {
+        "objects": [{"type": "cube", "x": o.x, "y": o.y, "z": o.z} for o in world.objects]
+    }
+
+def handle_menu_action(action, world, player, current_selection, file_manager):
+    global has_unsaved_changes
+    if not action or action == "STAY_OPEN": return True
+    
+    # Handle Exit separately to check for changes
+    if action == "exit":
+        if has_unsaved_changes:
+            pygame.event.set_grab(False)
+            pygame.mouse.set_visible(True)
+            res = file_manager.ask_save_changes() # returns True (yes), False (no), None (cancel)
+            if res is True: # Yes
+                # Attempt save
+                save_action = "save_project"
+                handle_menu_action(save_action, world, player, current_selection, file_manager)
+                return False # Exit after saving
+            elif res is False: # No
+                return False # Exit without saving
+            else: # Cancel
+                return True # Stay in app
+        return False
+
+    is_dialog_action = action in ["new_project", "open_project", "save_project", "save_as_project"]
+    if is_dialog_action:
+        pygame.event.set_grab(False)
+        pygame.mouse.set_visible(True)
+        pygame.event.pump()
+
+    if action == "new_project":
+        world.objects = []
+        file_manager.current_file_path = None
+        has_unsaved_changes = False
+        update_window_title(None)
+
+    elif action == "open_project":
+        path = file_manager.open_file_dialog()
+        if path:
+            data = file_manager.load_from_path(path)
+            if data:
+                world.objects = [] 
+                for obj_data in data.get("objects", []):
+                    cube = RectangularPrism(1, 1, 1)
+                    cube.set_position(obj_data['x'], obj_data['y'], obj_data['z'])
+                    world.add_object(cube)
+                has_unsaved_changes = False
+                update_window_title(path)
+        
+    elif action == "save_project":
+        path = file_manager.current_file_path
+        if not path:
+            path = file_manager.save_file_dialog()
+        
+        if path:
+            if file_manager.save_to_path(path, get_world_data(world)):
+                has_unsaved_changes = False
+                update_window_title(path)
+
+    elif action == "save_as_project":
+        path = file_manager.save_file_dialog("Save As...")
+        if path:
+            if file_manager.save_to_path(path, get_world_data(world)):
+                has_unsaved_changes = False
+                update_window_title(path)
+
+    elif action == "add_cube":
+        new_cube = RectangularPrism(1.0, 1.0, 1.0)
+        new_cube.set_position(0, 0.5, 0)
+        world.add_object(new_cube)
+        has_unsaved_changes = True
+        update_window_title(file_manager.current_file_path)
+
+    elif action == "delete":
+        if current_selection and current_selection in world.objects:
+            world.objects.remove(current_selection)
+            has_unsaved_changes = True
+            update_window_title(file_manager.current_file_path)
+            return "clear_selection"
+
+    if is_dialog_action:
+        pygame.event.clear()
+    
+    return True
 
 def get_ray_from_mouse(mouse_x, mouse_y, win_w, win_h):
     """Converts 2D screen coordinates to a 3D ray in world space."""
@@ -39,45 +145,22 @@ def setup_lighting():
     glLightfv(GL_LIGHT0, GL_AMBIENT, [0.2, 0.2, 0.2, 1])
     glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.8, 0.8, 0.8, 1])
 
-def handle_menu_action(action, world, player, current_selection):
-    """Processes menu actions using the explicitly passed selection."""
-    if not action or action == "STAY_OPEN": return True
-    if action == "exit": return False
-    
-    if action == "add_cube":
-        new_cube = RectangularPrism(1.0, 1.0, 1.0)
-        new_cube.set_position(0, 0.5, 0)
-        world.add_object(new_cube)
-        return True
-
-    if action == "delete":
-        if current_selection and current_selection in world.objects:
-            world.objects.remove(current_selection)
-            return "clear_selection"
-    return True
-
 def is_mouse_in_ui(menu_bar, mpos):
     """Checks if mouse is over the bar or any open submenus."""
-    # Check top bar
     if mpos[1] <= menu_bar.height:
         return True
     
-    # Check open submenus
     def check_recursive(items):
         for item in items:
             if item.is_open:
-                # Check the submenu area
                 if item.children:
-                    # Construct a rect for the whole submenu area
                     r = item.children[0].rect
                     submenu_rect = pygame.Rect(r.left, r.top, item.submenu_width, item.submenu_height)
                     if submenu_rect.collidepoint(mpos):
                         return True
-                    # Recurse into deeper submenus
                     if check_recursive(item.children):
                         return True
         return False
-    
     return check_recursive(menu_bar.items)
 
 def render_frame(world, player, menu_bar, gizmo, editor_mode, selected_obj):
@@ -130,30 +213,29 @@ def render_frame(world, player, menu_bar, gizmo, editor_mode, selected_obj):
 
 if __name__ == "__main__":
     config = Config()
-    pygame.init()
-    info = pygame.display.Info()
-    
-    w = max(640, int(info.current_w * 0.8))
-    h = max(480, int(info.current_h * 0.8))
-    os.environ['SDL_VIDEO_WINDOW_POS'] = f"{(info.current_w-w)//2},{(info.current_h-h)//2}"
-    
-    pygame.display.set_mode((w, h), DOUBLEBUF | OPENGL)
-    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    glClearColor(0.1, 0.1, 0.15, 1.0)
-    
+    initializer = EngineInitializer(config)
+    win_w, win_h = initializer.start()
     world = World(config)
     player = Player(config)
     menu_bar = MenuBar(config, pygame.font.Font(None, 24))
     gizmo = Gizmo()
+    file_manager = FileManager()
     
-    menu_bar.add_menu("File", [("Exit", "exit")])
+    update_window_title(None)
+    
+    menu_bar.add_menu("File", [
+        ("New Project", "new_project"),
+        ("Open", "open_project"),
+        ("Save", "save_project"),
+        ("Save As", "save_as_project"),
+        ("Exit", "exit")
+    ])
     menu_bar.add_menu("Edit", [("Delete", "delete")])
     menu_bar.add_menu("Add", [("Primitive", None, [("Cube", "add_cube")])])
 
     editor_mode = False
     pygame.event.set_grab(True)
     pygame.mouse.set_visible(False)
-    
     running = True
     selected_obj = None
     clock = pygame.time.Clock()
@@ -162,15 +244,23 @@ if __name__ == "__main__":
         clock.tick(60)
         events = pygame.event.get()
         mouse_pos = pygame.mouse.get_pos()
-        
         surface = pygame.display.get_surface()
-        if surface:
-            win_w, win_h = surface.get_size()
-        else:
-            win_w, win_h = 800, 600
+        win_w, win_h = surface.get_size() if surface else (win_w, win_h)
 
         for ev in events:
-            if ev.type == QUIT: running = False
+            if ev.type == QUIT:
+                if handle_menu_action("exit", world, player, selected_obj, file_manager) is False:
+                    running = False
+                continue
+
+            if ev.type == VIDEORESIZE:
+                win_w, win_h = ev.size
+                pygame.display.set_mode((win_w, win_h), DOUBLEBUF | OPENGL | RESIZABLE)
+                try:
+                    icon = pygame.image.load("zenith_ico_DRAFT.png")
+                    pygame.display.set_icon(icon)
+                except: pass
+            
             if ev.type == KEYDOWN:
                 if ev.key == K_F1 or ev.key == K_TAB:
                     editor_mode = not editor_mode
@@ -179,13 +269,11 @@ if __name__ == "__main__":
                     if not editor_mode: 
                         selected_obj = None 
                         gizmo.stop_drag()
-            
+
             if editor_mode:
                 if ev.type == MOUSEBUTTONDOWN and ev.button == 1:
-                    # NEW: Use comprehensive UI check to prevent deselecting when clicking menus
                     if not is_mouse_in_ui(menu_bar, mouse_pos):
                         ray_o, ray_d = get_ray_from_mouse(mouse_pos[0], mouse_pos[1], win_w, win_h)
-                        
                         hit_gizmo = False
                         if selected_obj:
                             axis_hit = gizmo.check_hover(ray_o, ray_d, np.array([selected_obj.x, selected_obj.y, selected_obj.z]))
@@ -211,24 +299,22 @@ if __name__ == "__main__":
         if editor_mode:
             menu_bar.update_layout(win_w)
             action = menu_bar.handle_input(events)
-            
             if action:
-                result = handle_menu_action(action, world, player, selected_obj)
-                if result is False: 
-                    running = False
-                elif result == "clear_selection": 
-                    selected_obj = None
-                    gizmo.stop_drag()
+                result = handle_menu_action(action, world, player, selected_obj, file_manager)
+                if result is False: running = False
+                elif result == "clear_selection": selected_obj = None
             
             if gizmo.active_axis is not None and selected_obj:
                 ray_o, ray_d = get_ray_from_mouse(mouse_pos[0], mouse_pos[1], win_w, win_h)
                 new_pos = gizmo.update_drag(ray_o, ray_d)
                 if new_pos is not None:
                     selected_obj.set_position(*new_pos)
+                    if not has_unsaved_changes:
+                        has_unsaved_changes = True
+                        update_window_title(file_manager.current_file_path)
         else:
             res = player.handle_input(events)
-            if res and all(v is not None for v in res):
-                player.update(*res)
+            if res and all(v is not None for v in res): player.update(*res)
 
         render_frame(world, player, menu_bar, gizmo, editor_mode, selected_obj)
 

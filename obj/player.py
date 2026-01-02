@@ -14,16 +14,17 @@ class Player:
         self.mouse_sensitivity = self.base_mouse_sensitivity
         self.fullscreen_toggle = fullscreen_toggle
 
-    def position(self, camera):
-        return (camera.x, camera.y, camera.z)
+    def position(self):
+        return (self.camera.x, self.camera.y, self.camera.z)
 
-    def handle_input(self, events, menu=None):
+    def handle_input(self, events):
         """
         Process keyboard and mouse input.
-        Returns forward and right movement values, or (None, None) if should quit.
+        Returns forward, right, and up movement values, or (None, None, None) if should quit.
         """
         forward = 0
         right = 0
+        up = 0
 
         # use live values from config if provided: treat as multipliers (100% = 1.0)
         if self.config:
@@ -35,27 +36,25 @@ class Player:
 
         for event in events:
             if event.type == QUIT:
-                return None, None
+                return None, None, None
+            
             if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    if menu:
-                        menu.toggle()
-                    else:
-                        return None, None
                 if event.key == K_F11:
                     # toggle fullscreen immediately
                     if self.fullscreen_toggle:
                         self.fullscreen_toggle()
+            
             if event.type == MOUSEMOTION:
-                # update camera rotation only when menu is not active
-                if not (menu and getattr(menu, "active", False)):
-                    mx, my = event.rel
-                    self.camera.yaw += mx * self.mouse_sensitivity
-                    self.camera.pitch -= my * self.mouse_sensitivity
-                    # Clamp pitch
-                    self.camera.pitch = max(-89.0, min(89.0, self.camera.pitch))
+                # Update camera rotation
+                mx, my = event.rel
+                self.camera.yaw += mx * self.mouse_sensitivity
+                self.camera.pitch -= my * self.mouse_sensitivity
+                # Clamp pitch to prevent flipping
+                self.camera.pitch = max(-89.0, min(89.0, self.camera.pitch))
 
         keys = pygame.key.get_pressed()
+        
+        # Horizontal movement
         if keys[K_w]:
             forward += 1
         if keys[K_s]:
@@ -64,12 +63,22 @@ class Player:
             right += 1
         if keys[K_a]:
             right -= 1
+            
+        # Vertical movement
+        if keys[K_SPACE]:
+            up += 1
+        if keys[K_LSHIFT]:
+            up -= 1
 
-        return forward, right
+        return forward, right, up
 
-    def update(self, forward, right):
+    def update(self, forward, right, up):
         """Update player camera position based on movement."""
+        # Move horizontally
         self.camera.move(forward, right)
+        # Move vertically (assuming the camera.y attribute can be adjusted directly 
+        # or that your Camera class has a vertical movement method)
+        self.camera.y += up * self.camera.move_speed
 
     def apply_look(self):
         """Apply camera view to OpenGL."""
