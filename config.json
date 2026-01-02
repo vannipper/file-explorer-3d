@@ -5,5 +5,5 @@
   "show_axes": true,
   "fov": 70,
   "start_fullscreen": false,
-  "debug_info": false
+  "debug_info": true
 }
