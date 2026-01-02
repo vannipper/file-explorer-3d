@@ -13,10 +13,11 @@ class World:
         self.objects.append(obj)
     
     def draw_axes(self):
-        """Draw coordinate axes."""
+        """Draw world-space coordinate axes."""
         if self.config and not self.config.get("show_axes", True):
             return
         
+        glDisable(GL_LIGHTING)
         glBegin(GL_LINES)
         # X axis (red)
         glColor3f(1, 0, 0)
@@ -33,12 +34,14 @@ class World:
         glVertex3f(0, 0, 0)
         glVertex3f(0, 0, 5)
         glEnd()
+        glEnable(GL_LIGHTING)
     
     def draw_floor(self, size=20, step=1):
         """Draw a grid floor."""
         if self.config and not self.config.get("show_grid", True):
             return
         
+        glDisable(GL_LIGHTING)
         glColor3f(0.3, 0.3, 0.3)
         glBegin(GL_LINES)
         for i in range(-size, size + 1, step):
@@ -49,12 +52,15 @@ class World:
             glVertex3f(i, 0, -size)
             glVertex3f(i, 0, size)
         glEnd()
+        glEnable(GL_LIGHTING)
     
     def draw_all(self):
-        """Draw floor, axes, and all objects."""
+        """Draw floor and axes."""
         self.draw_floor()
         self.draw_axes()
         
+        # Note: Object drawing is now handled in the main render loop 
+        # to allow for selection highlighting and gizmos.
         for obj in self.objects:
             glPushMatrix()
             glTranslatef(obj.x, obj.y, obj.z)

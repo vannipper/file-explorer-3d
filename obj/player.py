@@ -1,6 +1,6 @@
 import pygame
 from pygame.locals import *
-from objects.camera import Camera
+from obj.camera import Camera
 
 
 class Player:
