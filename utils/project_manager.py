@@ -87,28 +87,41 @@ class ProjectManager:
                 self.state.has_unsaved_changes = True
                 self.update_title()
 
-        # Focus Management: Ping OS to bring window back to front
+        # Focus Management
         if is_dialog:
             surf = pygame.display.get_surface()
             if surf:
                 pygame.display.set_mode(surf.get_size(), DOUBLEBUF | OPENGL | RESIZABLE)
-            return True # Signal force_editor
+            return True 
 
         return False
 
     def handle_exit(self):
         if self.state.has_unsaved_changes:
+            # Prepare for dialog
             pygame.event.set_grab(False)
             pygame.mouse.set_visible(True)
+            
             res = self.file_manager.ask_save_changes()
-            if res is True:
-                self.process_action("save_project")
-                self.state.running = False
-            elif res is False:
+            if res is True: # Save
+                # Try to save; if user cancels save dialog, we don't exit
+                path = self.file_manager.current_file_path or self.file_manager.save_file_dialog()
+                if path and self.file_manager.save_to_path(path, self.get_save_data()):
+                    self.state.running = False
+                else:
+                    self.restore_input_state()
+            elif res is False: # Don't Save
                 self.state.running = False
             else: # Cancel
-                if not self.state.editor_mode:
-                    pygame.event.set_grab(True)
-                    pygame.mouse.set_visible(False)
+                self.restore_input_state()
         else:
             self.state.running = False
+
+    def restore_input_state(self):
+        """Resets the mouse/grab state based on current editor mode if exit is cancelled."""
+        if not self.state.editor_mode:
+            pygame.event.set_grab(True)
+            pygame.mouse.set_visible(False)
+        else:
+            pygame.event.set_grab(False)
+            pygame.mouse.set_visible(True)

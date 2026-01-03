@@ -9,28 +9,35 @@ class FileManager:
         self.root.withdraw()
         self.current_file_path = None
         self.extension = ".zpf"
-        self.file_types = [("Zenith Project Files", f"*{self.extension}"), ("All Files", "*.*")]
+        self.default_file_types = [("Zenith Project Files", f"*{self.extension}"), ("All Files", "*.*")]
 
-    def open_file_dialog(self, title="Open Zenith Project"):
-        file_path = filedialog.askopenfilename(title=title, filetypes=self.file_types)
+    def open_file_dialog(self, title="Open Zenith Project", file_types=None):
+        """Opens a file dialog with optional custom file types."""
+        types = file_types if file_types else self.default_file_types
+        file_path = filedialog.askopenfilename(title=title, filetypes=types)
         if file_path:
-            self.current_file_path = file_path
+            # We only track the project path if we are opening a project file
+            if file_path.endswith(self.extension):
+                self.current_file_path = file_path
             return file_path
         return None
 
-    def save_file_dialog(self, title="Save Zenith Project"):
+    def save_file_dialog(self, title="Save Zenith Project", file_types=None):
+        """Opens a save dialog with optional custom file types."""
+        types = file_types if file_types else self.default_file_types
         file_path = filedialog.asksaveasfilename(
             title=title,
             defaultextension=self.extension,
-            filetypes=self.file_types
+            filetypes=types
         )
         if file_path:
-            self.current_file_path = file_path
+            if file_path.endswith(self.extension):
+                self.current_file_path = file_path
             return file_path
         return None
 
     def ask_save_changes(self):
-        """Prompts the user about unsaved changes. Returns 'yes', 'no', or 'cancel'."""
+        """Prompts the user about unsaved changes. Returns True (Yes), False (No), or None (Cancel)."""
         return messagebox.askyesnocancel("Unsaved Changes", "You have unsaved changes. Do you want to save them before exiting?")
 
     def save_to_path(self, path, world_data):
