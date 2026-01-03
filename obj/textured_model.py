@@ -1,9 +1,7 @@
 from OpenGL.GL import *
 
-
 class TexturedModel:
     """An object representing an imported 3D model with a texture."""
-    
     def __init__(self, vertices, texcoords, normals, faces, texture_id=None):
         self.vertices = vertices
         self.texcoords = texcoords
@@ -11,12 +9,11 @@ class TexturedModel:
         self.faces = faces
         self.texture_id = texture_id
         
-        # Position/Rotation/Scale
-        self.x, self.y, self.z = 0, 0, 0
-        self.rx, self.ry, self.rz = 0, 0, 0
-        self.sx, self.sy, self.sz = 1, 1, 1
+        # Paths relative to project root (Crucial for serialization)
+        self.rel_obj_path = None
+        self.rel_tex_path = None
         
-        # Create a Display List for performance
+        self.x, self.y, self.z = 0, 0, 0
         self.display_list = glGenLists(1)
         self._compile()
 
@@ -33,16 +30,12 @@ class TexturedModel:
         for face in self.faces:
             for vertex_data in face:
                 v_idx, t_idx, n_idx = vertex_data
-                
-                if n_idx != -1:
-                    glNormal3fv(self.normals[n_idx])
-                if t_idx != -1:
-                    glTexCoord2fv(self.texcoords[t_idx])
+                if n_idx != -1: glNormal3fv(self.normals[n_idx])
+                if t_idx != -1: glTexCoord2fv(self.texcoords[t_idx])
                 glVertex3fv(self.vertices[v_idx])
         glEnd()
         
-        if self.texture_id:
-            glDisable(GL_TEXTURE_2D)
+        if self.texture_id: glDisable(GL_TEXTURE_2D)
         glEndList()
 
     def draw(self):

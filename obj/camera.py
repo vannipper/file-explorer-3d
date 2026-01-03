@@ -3,7 +3,7 @@ from OpenGL.GLU import gluLookAt
 
 
 class Camera:
-    def __init__(self, x=0.0, y=1.0, z=5.0, yaw=0.0, pitch=0.0, move_speed=0.1):
+    def __init__(self, x=0.0, y=1.0, z=5.0, yaw=0.0, pitch=0.0, move_speed=1.0):
         self.x = x
         self.y = y
         self.z = z
@@ -23,8 +23,10 @@ class Camera:
         return dx, dy, dz
 
     def move(self, forward, right):
-        # forward, right are scalars (-1, 0, 1)
-        # We only move in XZ plane for now (no flying)
+        """
+        Move the camera based on forward/right distances (already scaled by dt).
+        forward, right are distances to move, not just direction.
+        """
         rad_yaw = math.radians(self.yaw)
 
         # Forward vector in XZ plane
@@ -35,8 +37,9 @@ class Camera:
         rx = math.cos(rad_yaw)
         rz = math.sin(rad_yaw)
 
-        self.x += (fx * forward + rx * right) * self.move_speed
-        self.z += (fz * forward + rz * right) * self.move_speed
+        # Apply movement (no additional move_speed multiplier needed)
+        self.x += fx * forward + rx * right
+        self.z += fz * forward + rz * right
 
     def apply_look(self):
         # Position the camera using gluLookAt

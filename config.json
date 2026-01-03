@@ -1,10 +1,9 @@
 {
-  "mouse_sensitivity": 1.0006744868035191,
-  "move_speed": 1.0006744868035191,
+  "mouse_sensitivity": 1.0,
+  "move_speed": 5.0,
   "show_grid": true,
   "show_axes": true,
   "fov": 70,
   "start_fullscreen": false,
-  "last_project_path": "C:/Users/vanni/OneDrive/Documents/Zenith/ExampleProject.zpf",
-  "debug_info": true
+  "last_project_path": "C:/Users/vanni/OneDrive/Documents/Zenith/ExampleProject.zenith"
 }

@@ -13,11 +13,15 @@ class World:
         self.objects.append(obj)
     
     def draw_axes(self):
-        """Draw world-space coordinate axes."""
+        """Draw world-space coordinate axes with higher priority (always on top)."""
         if self.config and not self.config.get("show_axes", True):
             return
         
+        # Disable depth testing so axes are always visible
+        glDisable(GL_DEPTH_TEST)
         glDisable(GL_LIGHTING)
+        
+        glLineWidth(2.0)  # Make axes slightly thicker for visibility
         glBegin(GL_LINES)
         # X axis (red)
         glColor3f(1, 0, 0)
@@ -34,6 +38,10 @@ class World:
         glVertex3f(0, 0, 0)
         glVertex3f(0, 0, 5)
         glEnd()
+        glLineWidth(1.0)
+        
+        # Re-enable depth testing for everything else
+        glEnable(GL_DEPTH_TEST)
         glEnable(GL_LIGHTING)
     
     def draw_floor(self, size=20, step=1):

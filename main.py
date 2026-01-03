@@ -12,6 +12,7 @@ try:
     from ui.menuObj.menu_bar import MenuBar
     from editor.gizmo import Gizmo
     from obj.player import Player
+    from obj.rectangular_prism import RectangularPrism
     from obj.world import World
     from obj.textured_model import TexturedModel
     from utils.file_manager import FileManager
@@ -27,15 +28,15 @@ def setup_menus(menu_bar):
     """Configures the top menu bar items."""
     menu_bar.add_menu("File", [
         ("New Project (Ctrl+N)", "new_project"),
-        ("Open (Ctrl+O)", "open_project"),
-        ("Save (Ctrl+S)", "save_project"),
+        ("Open Project (Ctrl+O)", "open_project"),
+        ("Save Project (Ctrl+S)", "save_project"),
         ("Save As (Ctrl+Shift+S)", "save_as_project"),
         ("Exit", "exit")
     ])
     menu_bar.add_menu("Edit", [("Delete (Del)", "delete")])
     menu_bar.add_menu("Add", [
         ("Primitive", None, [("Cube", "add_cube")]),
-        ("External", None, [("Import .OBJ", "import_model")])
+        ("Import Model", "import_model")
     ])
 
 def handle_selection(state, world, gizmo, m_pos):
@@ -54,9 +55,10 @@ def handle_selection(state, world, gizmo, m_pos):
         best, min_d = None, float('inf')
         for obj in world.objects:
             dist = np.linalg.norm(np.cross(ray_d, ray_o - np.array([obj.x, obj.y, obj.z])))
-            if dist < 0.5:
-                depth = np.dot(np.array([obj.x, obj.y, obj.z]) - ray_o, ray_d)
-                if 0 < depth < min_d: min_d, best = depth, obj
+            if dist < 0.6: 
+                depth = np.dot(ray_d, np.array([obj.x, obj.y, obj.z]) - ray_o)
+                if 0 < depth < min_d: 
+                    min_d, best = depth, obj
         state.selected_obj = best
 
 def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
@@ -72,12 +74,14 @@ def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
     glMatrixMode(GL_PROJECTION); glLoadIdentity()
     aspect = win_w / win_h if win_h > 0 else 1
     gluPerspective(player.config.get("fov", 70), aspect, 0.1, 1000.0)
+    
     glMatrixMode(GL_MODELVIEW); glLoadIdentity()
     player.apply_look()
 
+    # Draw floor first (with depth testing)
     world.draw_floor()
-    world.draw_axes()
     
+    # Draw objects
     for obj in world.objects:
         glPushMatrix()
         glTranslatef(obj.x, obj.y, obj.z)
@@ -97,9 +101,15 @@ def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
             obj.draw()
         glPopMatrix()
 
+    # Draw world axes AFTER objects so they're always visible
+    world.draw_axes()
+
+    # Draw gizmo LAST with depth testing disabled so it's always on top
     if state.selected_obj:
+        glDisable(GL_DEPTH_TEST)
         gizmo.draw(np.array([state.selected_obj.x, state.selected_obj.y, state.selected_obj.z]))
         glColor3f(1.0, 1.0, 1.0)
+        glEnable(GL_DEPTH_TEST)
         
     glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST)
     if state.editor_mode:
@@ -107,24 +117,26 @@ def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
     pygame.display.flip()
 
 def handle_model_import(world, file_manager, state, project):
-    """Logic for importing an OBJ model and optional texture."""
-    obj_path = file_manager.open_file_dialog(
-        title="Import 3D Model", 
-        file_types=[("OBJ Files", "*.obj"), ("All Files", "*.*")]
-    )
-    if not obj_path:
+    """Wrapper that utilizes FileManager's simplified workflow to load a model."""
+    
+    def save_callback(path):
+        file_manager.save_to_path(path, project.get_save_data())
+
+    # This result now returns (rel_obj_path, abs_obj_path) based on latest FileManager
+    result = file_manager.handle_model_import_workflow(save_callback)
+    if not result:
         return False
-        
-    data = ModelLoader.load_obj(obj_path)
+    
+    rel_obj, abs_obj = result
+    
+    # Load geometry
+    data = ModelLoader.load_obj(abs_obj)
     if data:
-        tex_path = file_manager.open_file_dialog(
-            title="Select Texture (Optional)", 
-            file_types=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp"), ("All Files", "*.*")]
-        )
-        tex_id = ModelLoader.load_texture(tex_path) if tex_path else None
-        
         v, t, n, f = data
-        model = TexturedModel(v, t, n, f, tex_id)
+        # Instantiate model with no texture as per latest request
+        model = TexturedModel(v, t, n, f, None)
+        model.rel_obj_path = rel_obj
+        model.rel_tex_path = None
         model.set_position(0, 0, 0)
         
         world.add_object(model)
@@ -138,27 +150,32 @@ if __name__ == "__main__":
     state = EditorState()
     initializer = EngineInitializer(config)
     
-    pygame.init()
-    info = pygame.display.Info()
-    win_w, win_h = initializer.start(
-        width=int(info.current_w * 0.9), 
-        height=int(info.current_h * 0.85)
-    )
+    # Start the splash screen immediately
+    initializer.show_splash("zenith_DRAFT.jpg")
     
-    world = World(config)
-    player = Player(config)
-    menu_bar = MenuBar(config, pygame.font.Font(None, 24))
-    gizmo = Gizmo()
-    file_manager = FileManager()
-    project = ProjectManager(state, world, file_manager, config)
+    # Give the OS a moment to actually display the splash window
+    import time
+    time.sleep(0.1)
+    
+    # Initialize Pygame
+    initializer.initialize_pygame()
+    
+    # Setup dimensions
+    win_w, win_h = initializer.setup_dimensions()
+    
+    # Initialize all engine components
+    world, player, menu_bar, gizmo, file_manager, project = initializer.initialize_engine_components(state)
     
     setup_menus(menu_bar)
     
-    last_path = config.get("last_project_path")
-    if last_path and os.path.exists(last_path):
-        project.process_action("open_project", auto_path=last_path)
-    else:
-        project.update_title()
+    # Initialize OpenGL window
+    win_w, win_h = initializer.finalize_engine_window()
+    
+    # Load last project if available
+    initializer.load_last_project()
+    
+    # Close splash AFTER everything is loaded (with minimum 2 second display)
+    initializer.close_splash()
 
     clock = pygame.time.Clock()
     
@@ -194,11 +211,11 @@ if __name__ == "__main__":
                 if ctrl:
                     if ev.key == K_s:
                         action = "save_as_project" if shift else "save_project"
-                        if project.process_action(action): state.editor_mode = True
+                        project.process_action(action)
                     elif ev.key == K_o:
-                        if project.process_action("open_project"): state.editor_mode = True
+                        project.process_action("open_project")
                     elif ev.key == K_n:
-                        if project.process_action("new_project"): state.editor_mode = True
+                        project.process_action("new_project")
                 elif ev.key == K_DELETE and state.editor_mode:
                     project.process_action("delete")
 
@@ -215,8 +232,8 @@ if __name__ == "__main__":
             
             if ui_action == "import_model":
                 handle_model_import(world, file_manager, state, project)
-            elif ui_action and project.process_action(ui_action):
-                state.editor_mode = True
+            elif ui_action:
+                project.process_action(ui_action)
             
             if gizmo.active_axis is not None and state.selected_obj:
                 ray_o, ray_d = InteractionHandler.get_ray(m_pos[0], m_pos[1])

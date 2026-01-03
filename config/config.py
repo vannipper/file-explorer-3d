@@ -8,7 +8,7 @@ class Config:
     
     DEFAULT_SETTINGS = {
         "mouse_sensitivity": 1.0,
-        "move_speed": 1.0,
+        "move_speed": 5.0,
         "show_grid": True,
         "show_axes": True,
         "fov": 70,
