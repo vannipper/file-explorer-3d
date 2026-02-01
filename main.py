@@ -160,6 +160,20 @@ if __name__ == "__main__":
     # Initialize Pygame
     initializer.initialize_pygame()
     
+    # Ensure the OS sends keyboard events to our window (prevents Windows "beep")
+    # and enable/disable SDL text input according to editor mode so text is handled
+    # by Pygame instead of the system.
+    try:
+        pygame.event.set_grab(not state.editor_mode)
+        pygame.mouse.set_visible(state.editor_mode)
+        if state.editor_mode:
+            pygame.key.start_text_input()
+        else:
+            pygame.key.stop_text_input()
+    except Exception:
+        # Older pygame may not have start/stop_text_input or other calls; ignore.
+        pass
+
     # Setup dimensions
     win_w, win_h = initializer.setup_dimensions()
     
@@ -202,6 +216,14 @@ if __name__ == "__main__":
                     state.editor_mode = not state.editor_mode
                     pygame.event.set_grab(not state.editor_mode)
                     pygame.mouse.set_visible(state.editor_mode)
+                    # Start/stop SDL text input to avoid system beep on keypresses
+                    try:
+                        if state.editor_mode:
+                            pygame.key.start_text_input()
+                        else:
+                            pygame.key.stop_text_input()
+                    except Exception:
+                        pass
                     state.selected_obj = None
                     gizmo.stop_drag()
                 elif ev.key == K_ESCAPE:
