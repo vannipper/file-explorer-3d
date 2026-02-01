@@ -44,9 +44,6 @@ Notes for developers
 Contributing
 - Active feature development is paused. Feel free to open issues for discussion or archive/reference PRs, but new major changes are discouraged while the C# rewrite is in progress.
 
-License
-- See repository for license information.
-
 Contact
 - Repository owner: vannipper
 - For questions or discussion, open an issue on the repo.
