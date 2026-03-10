@@ -1,4 +1,9 @@
-import pygame
+"""
+FileExplorer3D - interaction_handler.py
+Contains the InteractionHandler class, which handles the user's interaction screen.
+"""
+
+# imports
 import numpy as np
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -20,13 +25,3 @@ class InteractionHandler:
             return ray_o, (ray_d / norm if norm > 0 else ray_d)
         except:
             return np.array([0,0,0]), np.array([0,0,-1])
-
-    @staticmethod
-    def is_mouse_in_ui(menu_bar, mpos):
-        if mpos[1] <= menu_bar.height: return True
-        for item in menu_bar.items:
-            if item.is_open and item.children:
-                r = item.children[0].rect
-                if pygame.Rect(r.left, r.top, item.submenu_width, item.submenu_height).collidepoint(mpos):
-                    return True
-        return False

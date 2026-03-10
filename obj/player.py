@@ -1,3 +1,9 @@
+"""
+FileExplorer3D - player.py
+Contains the Player class, which handles some interaction events and contains a Camera object.
+"""
+
+# imports
 import pygame
 from pygame.locals import *
 from obj.camera import Camera
@@ -6,15 +12,13 @@ class Player:
     """Manages player camera and input handling with Delta Time support."""
 
     def __init__(self, config=None, mouse_sensitivity=0.1, move_speed=5.0, fullscreen_toggle=None):
+        # TODO: Some of these features (like vertical speed) were shoehorned in. Improve the implementation
         self.config = config
         self.base_mouse_sensitivity = mouse_sensitivity
-        # Speed is units per second
         self.base_move_speed = move_speed 
-        self.camera = Camera(move_speed=1.0)  # Set to 1.0, we'll handle scaling in update()
+        self.camera = Camera(move_speed=1.0) 
         self.mouse_sensitivity = self.base_mouse_sensitivity
         self.fullscreen_toggle = fullscreen_toggle
-        
-        # Vertical speed is same as horizontal now
         self.vertical_speed_mult = 1.0
 
     def position(self):
@@ -52,24 +56,19 @@ class Player:
         right = 0
         up = 0
 
-        # Horizontal input
         if keys[K_w]: forward += 1
         if keys[K_s]: forward -= 1
         if keys[K_d]: right += 1
         if keys[K_a]: right -= 1
         
-        # Vertical input
         if keys[K_SPACE]: up += 1
         if keys[K_LSHIFT]: up -= 1
 
-        # Calculate distance based on dt and base move speed
+        # distance based on dt and base move speed
         distance = self.base_move_speed * dt
         
-        # Apply horizontal movement (camera.move already handles direction)
         if forward != 0 or right != 0:
             self.camera.move(forward * distance, right * distance)
-            
-        # Apply vertical movement (same speed as horizontal)
         if up != 0:
             self.camera.y += up * distance
 

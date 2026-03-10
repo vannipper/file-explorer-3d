@@ -1,9 +1,13 @@
+"""
+FileExplorer3D - world.py
+Contains the World class, which manages drawable objects in the 3D environment.
+"""
+
+# imports
 from OpenGL.GL import *
 
-
+# TODO: Inspect if this class is used
 class World:
-    """Manages drawable objects in the 3D world."""
-    
     def __init__(self, config=None):
         self.objects = []
         self.config = config

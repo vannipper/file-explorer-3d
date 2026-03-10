@@ -1,3 +1,9 @@
+"""
+FileExplorer3D - gizmo.py (NAME WIP)
+Contains the Gizmo class, which handles the math for detecting the selection of on-screen objects.
+"""
+
+# imports
 import numpy as np
 from OpenGL.GL import *
 
@@ -5,7 +11,7 @@ class Gizmo:
     """A 3D transformation gizmo for translating objects."""
     def __init__(self):
         self.axis_length = 2.0
-        self.threshold = 0.3  # Distance threshold for clicking an axis
+        self.threshold = 0.3 # distance threshold
         self.active_axis = None # 0:X, 1:Y, 2:Z
         self.drag_start_pos = None
         self.drag_start_obj_pos = None
@@ -28,7 +34,7 @@ class Gizmo:
         for i in range(3):
             color = self.colors[i]
             if self.active_axis == i:
-                glColor3f(1.0, 1.0, 0.0) # Yellow highlight
+                glColor3f(1.0, 1.0, 0.0) # highlight
             else:
                 glColor3f(*color)
             
@@ -56,19 +62,13 @@ class Gizmo:
             
             denom = a * c - b * b
             
+            # parallel lines
             if abs(denom) < 1e-7:
-                # Lines are parallel
                 continue
             
-            # t is the parameter along the Gizmo Axis (u)
-            # s is the parameter along the Mouse Ray (v)
-            # Standard skew-line formula for these specific vector definitions:
             t = (b * e - c * d) / denom
             s = (a * e - b * d) / denom
             
-            # Check constraints: 
-            # 1. s > 0: The point must be in front of the camera
-            # 2. 0 <= t <= axis_length: The point must be on the visible gizmo segment
             if s > 0 and 0 <= t <= self.axis_length:
                 closest_on_axis = obj_pos + u * t
                 closest_on_ray = ray_o + v * s

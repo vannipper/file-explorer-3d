@@ -1,3 +1,9 @@
+"""
+FileExplorer3D - file_manager.py
+Contains the FileManager class, which allows users to select and use files or folders on their computer.
+"""
+
+# imports
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import json
@@ -8,7 +14,7 @@ class FileManager:
     def __init__(self):
         self.root = tk.Tk()
         self.root.withdraw()
-        self.current_project_path = None # Directory path
+        self.current_project_path = None # directory path
         self.extension = ".zenith"
         self.project_filename = "project.json"
 
@@ -38,28 +44,7 @@ class FileManager:
             return path
         return None
 
-    def handle_model_import_workflow(self, project_save_callback):
-        """
-        Handles the UI workflow for importing an OBJ model.
-        Returns (rel_obj_path, abs_obj_path) or None. 
-        Texture selection has been removed.
-        """
-        # 1. Select OBJ
-        obj_path = self.open_file_dialog(title="Import .OBJ", file_types=[("OBJ Files", "*.obj")])
-        if not obj_path: return None
-
-        # 2. Ensure project exists
-        if not self.current_project_path:
-            path = self.save_project_dialog(title="Create Project Folder to Store Assets")
-            if not path: return None
-            project_save_callback(path)
-
-        # 3. Import OBJ asset
-        rel_obj_path = self.import_asset(obj_path)
-        abs_obj_path = self.get_full_path(rel_obj_path)
-
-        return rel_obj_path, abs_obj_path
-
+    # TODO: This function can be repurposed for selecting parent folders
     def import_asset(self, source_path):
         """Copies an external file into the project's asset folder and returns relative path."""
         if not self.current_project_path:

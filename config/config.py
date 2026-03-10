@@ -1,3 +1,9 @@
+"""
+FileExplorer3D - config.py
+Contains the config class, which loads the user's last saved preferences (window size, last opened folder, etc.)
+"""
+
+# imports
 import json
 import os
 
@@ -6,6 +12,7 @@ class Config:
     
     CONFIG_FILE = "config.json"
     
+    # TODO: Remove any configs that aren't required and add ones that are
     DEFAULT_SETTINGS = {
         "mouse_sensitivity": 1.0,
         "move_speed": 5.0,

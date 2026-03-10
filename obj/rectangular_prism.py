@@ -1,5 +1,10 @@
-from OpenGL.GL import *
+"""
+FileExplorer3D - rectangular_prism.py
+Contains the RectangularPrism class.
+"""
 
+# imports
+from OpenGL.GL import *
 
 class RectangularPrism:
     """A 3D rectangular prism (box) with customizable dimensions."""
@@ -24,42 +29,42 @@ class RectangularPrism:
         
         glBegin(GL_QUADS)
         
-        # Front face (positive Z)
+        # front face (positive Z)
         glColor3f(1, 0, 0)
         glVertex3f(-w, -h, d)
         glVertex3f(w, -h, d)
         glVertex3f(w, h, d)
         glVertex3f(-w, h, d)
         
-        # Back face (negative Z)
+        # back face (negative Z)
         glColor3f(0, 1, 0)
         glVertex3f(-w, -h, -d)
         glVertex3f(-w, h, -d)
         glVertex3f(w, h, -d)
         glVertex3f(w, -h, -d)
         
-        # Left face (negative X)
+        # left face (negative X)
         glColor3f(0, 0, 1)
         glVertex3f(-w, -h, -d)
         glVertex3f(-w, -h, d)
         glVertex3f(-w, h, d)
         glVertex3f(-w, h, -d)
         
-        # Right face (positive X)
+        # right face (positive X)
         glColor3f(1, 1, 0)
         glVertex3f(w, -h, -d)
         glVertex3f(w, h, -d)
         glVertex3f(w, h, d)
         glVertex3f(w, -h, d)
         
-        # Top face (positive Y)
+        # top face (positive Y)
         glColor3f(1, 0, 1)
         glVertex3f(-w, h, -d)
         glVertex3f(-w, h, d)
         glVertex3f(w, h, d)
         glVertex3f(w, h, -d)
         
-        # Bottom face (negative Y)
+        # bottom face (negative Y)
         glColor3f(0, 1, 1)
         glVertex3f(-w, -h, -d)
         glVertex3f(w, -h, -d)

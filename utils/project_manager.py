@@ -1,8 +1,13 @@
+"""
+FileExplorer3D - project_manager.py
+Contains the ProjectManager class, which saves and loads project files.
+"""
+
+# imports
 import os
 import pygame
+
 from obj.rectangular_prism import RectangularPrism
-from obj.textured_model import TexturedModel
-from utils.model_loader import ModelLoader
 
 class ProjectManager:
     """Manages project lifecycle: new, open, save, and scene modifications."""
@@ -25,19 +30,10 @@ class ProjectManager:
         """Serializes current scene objects into a dictionary format."""
         objects_data = []
         for obj in self.world.objects:
-            if isinstance(obj, TexturedModel):
-                objects_data.append({
-                    "type": "textured_model",
-                    "x": obj.x, "y": obj.y, "z": obj.z,
-                    "obj_path": obj.rel_obj_path,
-                    "tex_path": obj.rel_tex_path
-                })
-            else:
-                # Default to cube/primitive
-                objects_data.append({
-                    "type": "cube",
-                    "x": obj.x, "y": obj.y, "z": obj.z
-                })
+            objects_data.append({
+                "type": "cube", # defaults to cube object
+                "x": obj.x, "y": obj.y, "z": obj.z
+            })
         return {"objects": objects_data}
 
     def process_action(self, action, auto_path=None):
@@ -61,25 +57,9 @@ class ProjectManager:
                 if data:
                     self.world.objects = []
                     for d in data.get("objects", []):
-                        if d["type"] == "textured_model":
-                            # Resolve relative paths to absolute system paths
-                            abs_obj = self.file_manager.get_full_path(d["obj_path"])
-                            abs_tex = self.file_manager.get_full_path(d["tex_path"]) if d.get("tex_path") else None
-                            
-                            m_data = ModelLoader.load_obj(abs_obj)
-                            if m_data:
-                                v, t, n, f = m_data
-                                tex_id = ModelLoader.load_texture(abs_tex) if abs_tex else None
-                                obj = TexturedModel(v, t, n, f, tex_id)
-                                obj.rel_obj_path = d["obj_path"]
-                                obj.rel_tex_path = d.get("tex_path")
-                                obj.set_position(d['x'], d['y'], d['z'])
-                                self.world.add_object(obj)
-                        else:
-                            # Standard cube primitive
-                            obj = RectangularPrism(1, 1, 1)
-                            obj.set_position(d['x'], d['y'], d['z'])
-                            self.world.add_object(obj)
+                        obj = RectangularPrism(1, 1, 1) # default to cube object
+                        obj.set_position(d['x'], d['y'], d['z'])
+                        self.world.add_object(obj)
                     
                     self.state.has_unsaved_changes = False
                     self.config.set("last_project_path", path)

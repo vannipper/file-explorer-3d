@@ -1,43 +1,23 @@
-import sys
-import os
+"""
+FileExplorer3D - main.py
+This is the main file which contains all module calls and the main loop.
+"""
+
+# imports
 import pygame
 import numpy as np
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
-# Existing engine imports
 try:
     from config.config import Config
-    from ui.menuObj.menu_bar import MenuBar
-    from editor.gizmo import Gizmo
-    from obj.player import Player
-    from obj.rectangular_prism import RectangularPrism
-    from obj.world import World
-    from obj.textured_model import TexturedModel
-    from utils.file_manager import FileManager
+    from utils.file_manager import FileManager # TODO: implement loading a parent folder as the first action for this app
     from initializer import EngineInitializer
     from editor.editor_state import EditorState
-    from utils.project_manager import ProjectManager
     from utils.interaction_handler import InteractionHandler
-    from utils.model_loader import ModelLoader
 except ImportError as e:
     print(f"Missing engine components: {e}")
-
-def setup_menus(menu_bar):
-    """Configures the top menu bar items."""
-    menu_bar.add_menu("File", [
-        ("New Project (Ctrl+N)", "new_project"),
-        ("Open Project (Ctrl+O)", "open_project"),
-        ("Save Project (Ctrl+S)", "save_project"),
-        ("Save As (Ctrl+Shift+S)", "save_as_project"),
-        ("Exit", "exit")
-    ])
-    menu_bar.add_menu("Edit", [("Delete (Del)", "delete")])
-    menu_bar.add_menu("Add", [
-        ("Primitive", None, [("Cube", "add_cube")]),
-        ("Import Model", "import_model")
-    ])
 
 def handle_selection(state, world, gizmo, m_pos):
     """Performs raycasting to select objects in the scene."""
@@ -61,7 +41,7 @@ def handle_selection(state, world, gizmo, m_pos):
                     min_d, best = depth, obj
         state.selected_obj = best
 
-def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
+def render_scene(win_w, win_h, state, world, player, gizmo):
     """Main rendering pipeline."""
     glViewport(0, 0, win_w, win_h)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -78,7 +58,6 @@ def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
     glMatrixMode(GL_MODELVIEW); glLoadIdentity()
     player.apply_look()
 
-    # Draw floor first (with depth testing)
     world.draw_floor()
     
     # Draw objects
@@ -94,17 +73,11 @@ def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
             glPopAttrib()
         else:
             glMaterialfv(GL_FRONT, GL_EMISSION, [0.0, 0.0, 0.0, 1.0])
-            if isinstance(obj, TexturedModel):
-                glColor3f(1.0, 1.0, 1.0)
-            else:
-                glColor3f(0.7, 0.7, 0.7)
             obj.draw()
         glPopMatrix()
 
-    # Draw world axes AFTER objects so they're always visible
     world.draw_axes()
 
-    # Draw gizmo LAST with depth testing disabled so it's always on top
     if state.selected_obj:
         glDisable(GL_DEPTH_TEST)
         gizmo.draw(np.array([state.selected_obj.x, state.selected_obj.y, state.selected_obj.z]))
@@ -112,89 +85,32 @@ def render_scene(win_w, win_h, state, world, player, gizmo, menu_bar):
         glEnable(GL_DEPTH_TEST)
         
     glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST)
-    if state.editor_mode:
-        menu_bar.draw(win_w, win_h)
     pygame.display.flip()
-
-def handle_model_import(world, file_manager, state, project):
-    """Wrapper that utilizes FileManager's simplified workflow to load a model."""
-    
-    def save_callback(path):
-        file_manager.save_to_path(path, project.get_save_data())
-
-    # This result now returns (rel_obj_path, abs_obj_path) based on latest FileManager
-    result = file_manager.handle_model_import_workflow(save_callback)
-    if not result:
-        return False
-    
-    rel_obj, abs_obj = result
-    
-    # Load geometry
-    data = ModelLoader.load_obj(abs_obj)
-    if data:
-        v, t, n, f = data
-        # Instantiate model with no texture as per latest request
-        model = TexturedModel(v, t, n, f, None)
-        model.rel_obj_path = rel_obj
-        model.rel_tex_path = None
-        model.set_position(0, 0, 0)
-        
-        world.add_object(model)
-        state.has_unsaved_changes = True
-        project.update_title()
-        return True
-    return False
 
 if __name__ == "__main__":
     config = Config()
     state = EditorState()
     initializer = EngineInitializer(config)
     
-    # Start the splash screen immediately
-    initializer.show_splash("zenith_DRAFT.jpg")
-    
-    # Give the OS a moment to actually display the splash window
-    import time
-    time.sleep(0.1)
-    
-    # Initialize Pygame
+    # initialize Pygame
     initializer.initialize_pygame()
-    
-    # Ensure the OS sends keyboard events to our window (prevents Windows "beep")
-    # and enable/disable SDL text input according to editor mode so text is handled
-    # by Pygame instead of the system.
-    try:
-        pygame.event.set_grab(not state.editor_mode)
-        pygame.mouse.set_visible(state.editor_mode)
-        if state.editor_mode:
-            pygame.key.start_text_input()
-        else:
-            pygame.key.stop_text_input()
-    except Exception:
-        # Older pygame may not have start/stop_text_input or other calls; ignore.
-        pass
+    pygame.event.set_grab(not state.editor_mode)
+    pygame.mouse.set_visible(state.editor_mode)
+    if state.editor_mode:
+        pygame.key.start_text_input()
+    else:
+        pygame.key.stop_text_input()
+    clock = pygame.time.Clock()
 
-    # Setup dimensions
-    win_w, win_h = initializer.setup_dimensions()
+    # initialize engine components
+    world, player, gizmo, file_manager, project = initializer.initialize_engine_components(state)
     
-    # Initialize all engine components
-    world, player, menu_bar, gizmo, file_manager, project = initializer.initialize_engine_components(state)
-    
-    setup_menus(menu_bar)
-    
-    # Initialize OpenGL window
+    # initialize OpenGL
     win_w, win_h = initializer.finalize_engine_window()
     
-    # Load last project if available
-    initializer.load_last_project()
-    
-    # Close splash AFTER everything is loaded (with minimum 2 second display)
-    initializer.close_splash()
-
-    clock = pygame.time.Clock()
-    
+    # main loop
     while state.running:
-        dt = clock.tick(60) / 1000.0 
+        dt = clock.tick(60) / 1000.0
         events = pygame.event.get()
         m_pos = pygame.mouse.get_pos()
         mods = pygame.key.get_mods()
@@ -205,6 +121,7 @@ if __name__ == "__main__":
             if player.handle_input(events) is False:
                 state.running = False
 
+        # events TODO: Add event handler module to reduce the length of main
         for ev in events:
             if ev.type == QUIT:
                 project.process_action("exit")
@@ -216,14 +133,12 @@ if __name__ == "__main__":
                     state.editor_mode = not state.editor_mode
                     pygame.event.set_grab(not state.editor_mode)
                     pygame.mouse.set_visible(state.editor_mode)
-                    # Start/stop SDL text input to avoid system beep on keypresses
-                    try:
-                        if state.editor_mode:
-                            pygame.key.start_text_input()
-                        else:
-                            pygame.key.stop_text_input()
-                    except Exception:
-                        pass
+                    
+                    if state.editor_mode: # avoid system beep on keypress
+                        pygame.key.start_text_input()
+                    else:
+                        pygame.key.stop_text_input()
+
                     state.selected_obj = None
                     gizmo.stop_drag()
                 elif ev.key == K_ESCAPE:
@@ -243,20 +158,11 @@ if __name__ == "__main__":
 
             if state.editor_mode:
                 if ev.type == MOUSEBUTTONDOWN and ev.button == 1:
-                    if not InteractionHandler.is_mouse_in_ui(menu_bar, m_pos):
-                        handle_selection(state, world, gizmo, m_pos)
+                    handle_selection(state, world, gizmo, m_pos)
                 elif ev.type == MOUSEBUTTONUP and ev.button == 1:
                     gizmo.stop_drag()
 
         if state.editor_mode:
-            menu_bar.update_layout(win_w)
-            ui_action = menu_bar.handle_input(events)
-            
-            if ui_action == "import_model":
-                handle_model_import(world, file_manager, state, project)
-            elif ui_action:
-                project.process_action(ui_action)
-            
             if gizmo.active_axis is not None and state.selected_obj:
                 ray_o, ray_d = InteractionHandler.get_ray(m_pos[0], m_pos[1])
                 new_pos = gizmo.update_drag(ray_o, ray_d)
@@ -267,6 +173,6 @@ if __name__ == "__main__":
         else:
             player.update(dt)
 
-        render_scene(win_w, win_h, state, world, player, gizmo, menu_bar)
+        render_scene(win_w, win_h, state, world, player, gizmo)
 
     pygame.quit()

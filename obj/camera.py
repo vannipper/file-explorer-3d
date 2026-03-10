@@ -1,6 +1,11 @@
+"""
+FileExplorer3D - camera.py
+Contains the Camera class, which helps the OpenGL render determine what gets drawn to the screen.
+"""
+
+# imports
 import math
 from OpenGL.GLU import gluLookAt
-
 
 class Camera:
     def __init__(self, x=0.0, y=1.0, z=5.0, yaw=0.0, pitch=0.0, move_speed=1.0):
@@ -29,20 +34,16 @@ class Camera:
         """
         rad_yaw = math.radians(self.yaw)
 
-        # Forward vector in XZ plane
         fx = math.sin(rad_yaw)
         fz = -math.cos(rad_yaw)
 
-        # Right vector in XZ plane
         rx = math.cos(rad_yaw)
         rz = math.sin(rad_yaw)
 
-        # Apply movement (no additional move_speed multiplier needed)
         self.x += fx * forward + rx * right
         self.z += fz * forward + rz * right
 
     def apply_look(self):
-        # Position the camera using gluLookAt
         dx, dy, dz = self.get_direction()
         eye = (self.x, self.y, self.z)
         center = (self.x + dx, self.y + dy, self.z + dz)
