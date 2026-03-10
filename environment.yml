@@ -1,0 +1,14 @@
+# FileExplorer3D - environment.yml
+# Allows a developer set up their environment quickly and easily.
+
+name: FileExplorer3D
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - numpy
+  - pip
+  - pip:
+    - pygame
+    - PyOpenGL
+    - PyOpenGL_accelerate

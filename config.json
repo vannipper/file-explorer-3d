@@ -1,6 +1,6 @@
 {
   "mouse_sensitivity": 1.0,
-  "move_speed": 5.0,
+  "move_speed": 2.0,
   "show_grid": true,
   "show_axes": true,
   "fov": 70,

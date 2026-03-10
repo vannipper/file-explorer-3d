@@ -1,4 +1,0 @@
-pygame
-numpy
-PyOpenGL
-PyOpenGL_accelerate
