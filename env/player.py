@@ -6,7 +6,7 @@ Contains the Player class, which handles some interaction events and contains a 
 # imports
 import pygame
 from pygame.locals import *
-from obj.camera import Camera
+from env.camera import Camera
 
 class Player:
     """Manages player camera and input handling with Delta Time support."""
@@ -24,8 +24,13 @@ class Player:
     def position(self):
         return (self.camera.x, self.camera.y, self.camera.z)
 
-    def handle_input(self, events):
-        """Processes discrete events (mouse motion, quitting)."""
+    def handle_events(self, events):
+        """
+        Processes discrete events (mouse motion, quitting).
+        Returns whether the app should continue running or not as a boolean.
+        """
+        if not events: return True
+
         if self.config:
             ms_mult = self.config.get("mouse_sensitivity", 1.0)
             mv_mult = self.config.get("move_speed", 1.0)
@@ -36,10 +41,14 @@ class Player:
             if event.type == QUIT:
                 return False
             
+            # TODO: Video resize event logic (full screen or windowed)
+
+            # Key event logic
             if event.type == KEYDOWN:
                 if event.key == K_F11 and self.fullscreen_toggle:
                     self.fullscreen_toggle()
             
+            # Mouse event logic
             if event.type == MOUSEMOTION:
                 mx, my = event.rel
                 self.camera.yaw += mx * self.mouse_sensitivity

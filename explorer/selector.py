@@ -1,13 +1,13 @@
 """
-FileExplorer3D - gizmo.py (NAME WIP)
-Contains the Gizmo class, which handles the math for detecting the selection of on-screen objects.
+FileExplorer3D - selector.py (NAME WIP)
+Contains the Selector class, which handles the selection of on-screen objects.
 """
 
 # imports
 import numpy as np
 from OpenGL.GL import *
 
-class Gizmo:
+class Selector:
     """A 3D transformation gizmo for translating objects."""
     def __init__(self):
         self.axis_length = 2.0
