@@ -7,6 +7,8 @@ Contains the Selector class, which handles the selection of on-screen objects.
 import numpy as np
 from OpenGL.GL import *
 
+from utils.interaction_handler import InteractionHandler
+
 class Selector:
     """A 3D transformation gizmo for translating objects."""
     def __init__(self):
@@ -43,6 +45,29 @@ class Selector:
         glEnd()
         glLineWidth(1.0)
         glEnable(GL_LIGHTING)
+
+    def handle_selection(self, objects, selected_object):
+        """Performs raycasting to select objects in the scene."""
+        mpos = InteractionHandler.GetMousePosition()
+        ray_o, ray_d = InteractionHandler.GetRay(mpos[0], mpos[1])
+        hit_selector = False
+        
+        if selected_object:
+            obj_pos = np.array([selected_object.x, selected_object.y, selected_object.z])
+            axis = self.check_hover(ray_o, ray_d, obj_pos)
+            if axis is not None:
+                self.start_drag(axis, ray_o, ray_d, obj_pos)
+                hit_selector = True
+        
+        if not hit_selector:
+            best, min_d = None, float('inf')
+            for obj in objects:
+                dist = np.linalg.norm(np.cross(ray_d, ray_o - np.array([obj.x, obj.y, obj.z])))
+                if dist < 0.6: 
+                    depth = np.dot(ray_d, np.array([obj.x, obj.y, obj.z]) - ray_o)
+                    if 0 < depth < min_d: 
+                        min_d, best = depth, obj
+            selected_object = best
 
     def check_hover(self, ray_o, ray_d, obj_pos):
         """Returns the axis index if the ray is near a gizmo handle, else None."""

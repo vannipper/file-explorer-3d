@@ -28,7 +28,7 @@ class InteractionHandler:
         pygame.display.set_mode((newWidth, newHeight), DOUBLEBUF | OPENGL | RESIZABLE)
 
     @staticmethod
-    def get_ray(mouse_x, mouse_y):
+    def GetRay(mouse_x, mouse_y):
         modelview = glGetDoublev(GL_MODELVIEW_MATRIX)
         projection = glGetDoublev(GL_PROJECTION_MATRIX)
         viewport = glGetIntegerv(GL_VIEWPORT)
