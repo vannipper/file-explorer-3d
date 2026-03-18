@@ -1,43 +1,38 @@
 """
 FileExplorer3D - config.py
-Contains the config class, which loads the user's last saved preferences (window size, last opened folder, etc.)
+Contains the Config class, which loads and saves user preferences.
 """
 
-# imports
 import json
 import os
 
 class Config:
     """Handles loading and saving user preferences."""
-    
+
     CONFIG_FILE = "config.json"
-    
-    # TODO: Remove any configs that aren't required and add ones that are
+
     DEFAULT_SETTINGS = {
         "mouse_sensitivity": 1.0,
         "move_speed": 5.0,
-        "show_grid": True,
-        "show_axes": True,
-        "fov": 70,
-        "start_fullscreen": False,
-        "last_project_path": None,
+        "last_opened_folder": None,
+        "window_width": 1280,
+        "window_height": 720,
     }
-    
+
     def __init__(self):
         self.settings = self.load()
-    
+
     def load(self):
         """Load settings from config file, or return defaults if not found."""
         if os.path.exists(self.CONFIG_FILE):
             try:
                 with open(self.CONFIG_FILE, 'r') as f:
-                    loaded_settings = json.load(f)
-                    # Merge defaults to ensure new keys exist
-                    return {**self.DEFAULT_SETTINGS, **loaded_settings}
+                    loaded = json.load(f)
+                    return {**self.DEFAULT_SETTINGS, **loaded}
             except Exception:
                 return self.DEFAULT_SETTINGS.copy()
         return self.DEFAULT_SETTINGS.copy()
-    
+
     def save(self):
         """Save current settings to config file."""
         try:
@@ -45,11 +40,9 @@ class Config:
                 json.dump(self.settings, f, indent=2)
         except Exception as e:
             print(f"Failed to save config: {e}")
-    
+
     def get(self, key, default=None):
-        """Get a setting value."""
         return self.settings.get(key, default)
-    
+
     def set(self, key, value):
-        """Set a setting value in memory without writing to disk."""
         self.settings[key] = value

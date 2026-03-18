@@ -6,6 +6,7 @@ Contains the EngineInitializer class, which handles all Pygame, OpenGL, etc. ini
 # imports
 import os
 import pygame
+import platform as sys_platform
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -21,39 +22,42 @@ class EngineInitializer:
 
     @staticmethod
     def InitializePygame():
-        """Initialize Pygame and display info."""
         pygame.init()
         pygame.mouse.set_visible(False)
+        pygame.event.set_grab(True)
     
     @staticmethod
     def InitializeEngineComponents(config):
         """Initialize all engine components (world, player, etc.)."""
         
-        world = World(config)
+        world = World()
         player = Player(config)
         selector = Selector()
-        file_manager = FileManager()
-        
-        return world, player, selector, file_manager
+
+        return world, player, selector, None
+
+    # self._set_app_icon("zenith_ico_DRAFT.png") # TODO: Change this path to FileExplorer3D .png
 
     @staticmethod
     def InitializeOpenGLWindow():
-        """Creates OpenGL window minimized so splash stays visible."""
-        di = pygame.display.Info()
-    
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
-        pygame.display.set_mode((di.current_w, di.current_h), DOUBLEBUF | OPENGL | RESIZABLE)
-        pygame.display.set_caption(f"FileExplorer3D {VERSION}")
-        
-        # self._set_app_icon("zenith_ico_DRAFT.png") # TODO: Change this path to FileExplorer3D .png
+        if sys_platform.system() == "Windows":
+            import ctypes
+            work_w = ctypes.windll.user32.GetSystemMetrics(16)
+            work_h = ctypes.windll.user32.GetSystemMetrics(17)
+        else:
+            di = pygame.display.Info()
+            work_w = di.current_w
+            work_h = di.current_h - 80  # accounts for Mac menu bar + dock
 
-        # setup openGL 
+        pygame.display.set_mode((work_w, work_h), DOUBLEBUF | OPENGL | RESIZABLE)
+        pygame.display.set_caption(f"FileExplorer3D {VERSION}")
+
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_DEPTH_TEST)
         glClearColor(0.1, 0.1, 0.15, 1.0)
-        
-        return di.current_w, di.current_h
+
+        return work_w, work_h
     
     # TODO: Repurpose this to loading the last opened parent folder
     @staticmethod
