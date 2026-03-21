@@ -4,30 +4,23 @@ Contains the FileManager class, which allows users to select parent folders on t
 """
 
 # imports
-import tkinter as tk
 from tkinter import filedialog
-import json
-import os
+from pygame.locals import *
+from utils.interaction_handler import InteractionHandler
 
-# TODO: Try to make this class static
 class FileManager:
-    def __init__(self):
-        self.root = tk.Tk()
-        self.root.withdraw()
 
-    # TODO: This function can be repurposed for selecting parent folders
-    def load_from_path(self, project_dir):
-        try:
-            json_path = os.path.join(project_dir, self.project_filename)
-            if not os.path.exists(json_path): return None
-            with open(json_path, 'r') as f:
-                data = json.load(f)
-            self.current_project_path = project_dir
-            return data
-        except Exception as e:
-            print(f"Failed to load project: {e}")
-            return None
-    
-    # TODO: This function can be repurposed for selecting parent folders
-    def open_file_dialog(self, title="Open File", file_types=None):
-        return filedialog.askopenfilename(title=title, filetypes=file_types or [("All Files", "*.*")])
+    @staticmethod
+    def open_file_dialog(config):
+        last_folder = config.get('last_opened_folder')
+        if last_folder:
+            return filedialog.askdirectory(initialdir=last_folder, title='Pick a Root Folder')
+        return filedialog.askdirectory(title='Pick a Root Folder')
+
+    def handle_events(events, root):
+        for event in events:
+            if event.type == KEYDOWN and InteractionHandler.CtrlPressed() and event.key == K_o:
+                new_folder = filedialog.askdirectory(initialdir=root, title='Open Root Folder')
+                if new_folder:
+                    root = new_folder
+        return root
