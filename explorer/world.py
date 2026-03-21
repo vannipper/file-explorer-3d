@@ -22,6 +22,12 @@ class World:
         """Add a drawable object to the world."""
         self.objects.append(obj)
 
+    def clear(self):
+        """Remove all objects and reset selection. Called when loading a new directory."""
+        self.objects = []
+        self.selected_object = None
+        self.selector.stop_drag()
+
     def deselect_object(self):
         self.selected_object = None
 
@@ -44,14 +50,7 @@ class World:
                     self.cursor_visible = False
                     pygame.mouse.set_visible(False)
                 else:
-                    self.selector.handle_selection(self.objects, self.selected_object)
+                    self.selected_object = self.selector.handle_selection(self.objects)
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 self.selector.stop_drag()
-
-            if self.selector.active_axis and self.selected_object:
-                mpos = InteractionHandler.GetMousePosition()
-                ray_o, ray_d = InteractionHandler.GetRay(mpos[0], mpos[1])
-                new_pos = self.selector.update_drag(ray_o, ray_d)
-                if new_pos:
-                    self.selected_object.set_position(*new_pos)
