@@ -1,33 +1,44 @@
 """
 FileExplorer3D - file_manager.py
-Contains the FileManager class, which allows users to select parent folders on their computer.
+Handles folder selection via native OS dialogs.
 """
 
-# imports
-import tkinter as tk
-from tkinter import filedialog
-import json
 import os
+from pygame.locals import *
+from utils.interaction_handler import InteractionHandler
 
-# TODO: Try to make this class static
+
+def _askdirectory(**kwargs):
+    """Lazy-import tkinter so it doesn't interfere with SDL display detection."""
+    from tkinter import filedialog
+    return filedialog.askdirectory(**kwargs)
+
+
 class FileManager:
-    def __init__(self):
-        self.root = tk.Tk()
-        self.root.withdraw()
 
-    # TODO: This function can be repurposed for selecting parent folders
-    def load_from_path(self, project_dir):
-        try:
-            json_path = os.path.join(project_dir, self.project_filename)
-            if not os.path.exists(json_path): return None
-            with open(json_path, 'r') as f:
-                data = json.load(f)
-            self.current_project_path = project_dir
-            return data
-        except Exception as e:
-            print(f"Failed to load project: {e}")
-            return None
-    
-    # TODO: This function can be repurposed for selecting parent folders
-    def open_file_dialog(self, title="Open File", file_types=None):
-        return filedialog.askopenfilename(title=title, filetypes=file_types or [("All Files", "*.*")])
+    @staticmethod
+    def open_folder_dialog(config):
+        """Auto-open last folder if valid, otherwise prompt the user."""
+        last_folder = config.get('last_opened_folder')
+        if last_folder and os.path.isdir(last_folder):
+            return last_folder
+
+        selected = _askdirectory(title='Pick a Root Folder')
+        if selected:
+            config.set('last_opened_folder', selected)
+            config.save()
+        return selected
+
+    @staticmethod
+    def handle_events(events, current_dir, config):
+        """Handle Ctrl+O to open a new folder. Returns new path or current_dir."""
+        for event in events:
+            if event.type == KEYDOWN and InteractionHandler.CtrlPressed() and event.key == K_o:
+                new_folder = _askdirectory(
+                    initialdir=current_dir, title='Open Root Folder'
+                )
+                if new_folder:
+                    config.set('last_opened_folder', new_folder)
+                    config.save()
+                    return new_folder
+        return current_dir

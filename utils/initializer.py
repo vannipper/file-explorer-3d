@@ -13,7 +13,6 @@ from OpenGL.GLU import *
 from explorer.world import World
 from env.player import Player
 from explorer.selector import Selector
-from utils.file_manager import FileManager
 
 VERSION = "- *Development"
 
@@ -23,8 +22,6 @@ class EngineInitializer:
     @staticmethod
     def InitializePygame():
         pygame.init()
-        pygame.mouse.set_visible(False)
-        pygame.event.set_grab(True)
     
     @staticmethod
     def InitializeEngineComponents(config):
@@ -51,6 +48,8 @@ class EngineInitializer:
 
         pygame.display.set_mode((work_w, work_h), DOUBLEBUF | OPENGL | RESIZABLE)
         pygame.display.set_caption(f"FileExplorer3D {VERSION}")
+        pygame.mouse.set_visible(False)
+        pygame.event.set_grab(True)
 
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -59,12 +58,6 @@ class EngineInitializer:
 
         return work_w, work_h
     
-    # TODO: Repurpose this to loading the last opened parent folder
-    @staticmethod
-    def load_last_project(config):
-        """Load the last opened project if it exists."""
-        last_path = config.get("last_project_path")
-
     @staticmethod
     def setAppIcon(icon_path):
         """Sets the window icon after the display mode is established."""
