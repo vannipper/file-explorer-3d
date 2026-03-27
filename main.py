@@ -61,8 +61,9 @@ if __name__ == "__main__":
         if new_size:
             win_w, win_h = new_size
         
-        # update player
+        # updates
         player.update(dt)
+        world.update()
 
         # Rendering pipeline
         Renderer.SetupFrame(win_w, win_h, config)
