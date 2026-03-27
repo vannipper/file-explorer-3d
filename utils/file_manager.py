@@ -17,6 +17,7 @@ class FileManager:
             return filedialog.askdirectory(initialdir=last_folder, title='Pick a Root Folder')
         return filedialog.askdirectory(title='Pick a Root Folder')
 
+    @staticmethod
     def handle_events(events, root):
         for event in events:
             if event.type == KEYDOWN and InteractionHandler.CtrlPressed() and event.key == K_o:

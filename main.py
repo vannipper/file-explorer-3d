@@ -48,10 +48,17 @@ if __name__ == "__main__":
 
         # Handle Pygame events
         events = pygame.event.get()
-        root_folder = FileManager.handle_events(events, root_folder)
+        
+        new_folder = FileManager.handle_events(events, root_folder)
+        if new_folder != root_folder:
+            root_folder = new_folder
+
         run = player.handle_events(events)
         world.handle_events(events)
-        Renderer.handle_events(events)
+
+        new_size = Renderer.handle_events(events)
+        if new_size:
+            win_w, win_h = new_size
         
         # update player
         player.update(dt)
