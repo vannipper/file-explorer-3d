@@ -3,13 +3,14 @@ FileExplorer3D - world.py
 Contains the World class, which manages drawable objects in the 3D environment.
 """
 
-# imports
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
 
 from explorer.selector import Selector
+from explorer.file_tree_node import make_root
 from utils.interaction_handler import InteractionHandler
+
 
 class World:
     def __init__(self):
@@ -19,7 +20,6 @@ class World:
         self.cursor_visible = False
 
     def add_object(self, obj):
-        """Add a drawable object to the world."""
         self.objects.append(obj)
 
     def clear(self):
@@ -35,20 +35,47 @@ class World:
         self.deselect_object()
 
     def update(self):
-        """Called every frame. Highlights whichever object the crosshair is aimed at."""
+        """Per-frame hover-selection: highlight whichever object the crosshair aims at."""
         if not self.cursor_visible:
             self.selected_object = self.selector.handle_selection(self.objects)
-        
+
+    def _activate_selected(self):
+        """Called on click. Prints the file tree rooted at the selected object."""
+        obj = self.selected_object
+        if obj is None:
+            return
+
+        node = make_root(obj.file_path) if obj.is_dir else make_root(obj.file_path)
+
+        print(f"\n── {obj.file_name}")
+        if obj.is_dir:
+            node.expand()
+            self._print_tree(node, prefix="   ")
+        print()
+
+    def _print_tree(self, node, prefix=""):
+        children = node.get_children()
+        for i, child in enumerate(children):
+            connector = "└── " if i == len(children) - 1 else "├── "
+            print(f"{prefix}{connector}{child.name}")
+            if child.is_dir:
+                extension = "    " if i == len(children) - 1 else "│   "
+                self._print_tree(child, prefix + extension)
+
     def handle_events(self, events):
         for event in events:
             if event.type == KEYDOWN and event.key == K_ESCAPE:
                 self.cursor_visible = True
                 pygame.mouse.set_visible(True)
-                pygame.mouse.set_pos(pygame.display.get_surface().get_width() // 2, 
-                                    pygame.display.get_surface().get_height() // 2)
+                pygame.mouse.set_pos(
+                    pygame.display.get_surface().get_width() // 2,
+                    pygame.display.get_surface().get_height() // 2,
+                )
                 self.deselect_object()
 
             elif event.type == MOUSEBUTTONDOWN and event.button == 1:
                 if self.cursor_visible:
                     self.cursor_visible = False
                     pygame.mouse.set_visible(False)
+                else:
+                    self._activate_selected()

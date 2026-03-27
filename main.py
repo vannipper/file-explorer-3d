@@ -14,6 +14,7 @@ from utils.initializer import EngineInitializer
 from utils.interaction_handler import InteractionHandler
 from utils.renderer import Renderer
 from utils.directory_scanner import DirectoryScanner
+from explorer.file_tree_node import make_root
 
 if __name__ == "__main__":
     
@@ -25,6 +26,7 @@ if __name__ == "__main__":
     root_folder = FileManager.open_file_dialog(config)
     if not root_folder:
         exit(1)
+    root_node = make_root(root_folder)
 
     # initialize Pygame
     EngineInitializer.InitializePygame()
@@ -52,6 +54,7 @@ if __name__ == "__main__":
         new_folder = FileManager.handle_events(events, root_folder)
         if new_folder != root_folder:
             root_folder = new_folder
+            root_node = make_root(root_folder)
             DirectoryScanner.fill_world(world, root_folder)
 
         run = player.handle_events(events)
@@ -79,7 +82,6 @@ if __name__ == "__main__":
         Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
         Renderer.DrawCrosshair(win_w, win_h)
 
-        # Flip display buffer
         pygame.display.flip()
 
     pygame.quit()
