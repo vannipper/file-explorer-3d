@@ -5,16 +5,15 @@ This is the main file which contains all module calls and the main loop.
 
 # pip imports
 import pygame
-import numpy as np
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from config.config import Config
-from env.rectangular_prism import RectangularPrism
 from utils.file_manager import FileManager
 from utils.initializer import EngineInitializer
 from utils.interaction_handler import InteractionHandler
 from utils.renderer import Renderer
+from utils.directory_scanner import DirectoryScanner
 
 if __name__ == "__main__":
     
@@ -34,13 +33,14 @@ if __name__ == "__main__":
     # initialize engine components
     EngineInitializer.load_last_project(config)
     world, player, selector, file_manager = EngineInitializer.InitializeEngineComponents(config)
-    
+
     # video variables
     win_w, win_h = EngineInitializer.InitializeOpenGLWindow()
     mpos = InteractionHandler.GetMousePosition()
-    
-    world.add_object(RectangularPrism())
 
+    # populate world with objects
+    DirectoryScanner.fill_world(world, root_folder)
+    
     # main loop
     run = True
     while run:
@@ -52,6 +52,7 @@ if __name__ == "__main__":
         new_folder = FileManager.handle_events(events, root_folder)
         if new_folder != root_folder:
             root_folder = new_folder
+            DirectoryScanner.fill_world(world, root_folder)
 
         run = player.handle_events(events)
         world.handle_events(events)
@@ -60,8 +61,9 @@ if __name__ == "__main__":
         if new_size:
             win_w, win_h = new_size
         
-        # update player
+        # updates
         player.update(dt)
+        world.update()
 
         # Rendering pipeline
         Renderer.SetupFrame(win_w, win_h, config)
@@ -73,8 +75,9 @@ if __name__ == "__main__":
             Renderer.DrawObject(obj, world.selected_object)
         if config.get('should_draw_axes', True): #TODO: Add this to config class
             Renderer.DrawAxes()
-        if world.selected_object:
-            Renderer.HighlightSelectedObject(world.selected_object, world.selector)
+
+        Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
+        Renderer.DrawCrosshair(win_w, win_h)
 
         # Flip display buffer
         pygame.display.flip()
