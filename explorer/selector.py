@@ -12,7 +12,7 @@ from utils.interaction_handler import InteractionHandler
 class Selector:
     """A 3D transformation gizmo for translating objects."""
     def __init__(self):
-        self.axis_length = 2.0
+        self.axis_length = 0.75
         self.threshold = 0.3 # distance threshold
         self.active_axis = None # 0:X, 1:Y, 2:Z
         self.drag_start_pos = None

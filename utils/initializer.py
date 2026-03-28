@@ -56,7 +56,9 @@ class EngineInitializer:
         glEnable(GL_DEPTH_TEST)
         glClearColor(0.1, 0.1, 0.15, 1.0)
 
-        return work_w, work_h
+        # Return actual framebuffer size (differs from logical size on Retina)
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        return int(viewport[2]), int(viewport[3])
     
     @staticmethod
     def setAppIcon(icon_path):

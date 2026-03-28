@@ -16,8 +16,9 @@ class Renderer:
         for event in events:
             if event.type == VIDEORESIZE:
                 InteractionHandler.ResizeWindow(*event.size)
-                return event.size
-        return 1280, 720
+                viewport = glGetIntegerv(GL_VIEWPORT)
+                return int(viewport[2]), int(viewport[3])
+        return None
 
     @staticmethod
     def SetupFrame(win_w, win_h, config):
