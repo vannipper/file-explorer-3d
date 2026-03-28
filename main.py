@@ -52,6 +52,7 @@ if __name__ == "__main__":
             win_w, win_h = new_size
 
         player.update(dt)
+        world.update()
 
         # Rendering
         Renderer.SetupFrame(win_w, win_h, config)
@@ -63,6 +64,9 @@ if __name__ == "__main__":
             Renderer.DrawObject(obj, world.selected_object)
         if config.get('show_axes', True):
             Renderer.DrawAxes()
+
+        Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
+        Renderer.DrawCrosshair(win_w, win_h)
 
         pygame.display.flip()
 

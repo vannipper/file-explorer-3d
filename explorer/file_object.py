@@ -36,6 +36,20 @@ FOLDER_COLOR  = (0.15, 0.3, 0.8)
 DEFAULT_COLOR = (0.65, 0.65, 0.65)
 ERROR_COLOR   = (0.9, 0.1, 0.1)
 
+HIGHLIGHT_COLOR = (1.0, 0.85, 0.2)  # warm yellow tint when selected
+HIGHLIGHT_BLEND = 0.5               # 0 = original, 1 = full highlight
+
+
+def _tint(color, selected: bool):
+    """Lerp color toward HIGHLIGHT_COLOR when selected."""
+    if not selected:
+        return color
+    return (
+        color[0] + (HIGHLIGHT_COLOR[0] - color[0]) * HIGHLIGHT_BLEND,
+        color[1] + (HIGHLIGHT_COLOR[1] - color[1]) * HIGHLIGHT_BLEND,
+        color[2] + (HIGHLIGHT_COLOR[2] - color[2]) * HIGHLIGHT_BLEND,
+    )
+
 
 class FileObject:
     """A 3D prism representing a file or folder."""
@@ -74,12 +88,7 @@ class FileObject:
 
     def draw(self, selected=False):
         w, h, d = self.width / 2, self.height / 2, self.depth / 2
-        r, g, b = self.color
-
-        if selected:
-            r = r + (1.0 - r) * 0.3
-            g = g + (0.85 - g) * 0.3
-            b = b + (0.2 - b) * 0.3
+        r, g, b = _tint(self.color, selected)
 
         glBegin(GL_QUADS)
 

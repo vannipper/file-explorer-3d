@@ -64,6 +64,15 @@ class World:
     def deselect_object(self):
         self.selected_object = None
 
+    def delete_object(self, obj):
+        self.objects.remove(obj)
+        self.deselect_object()
+
+    def update(self):
+        """Called every frame. Highlights whichever object the crosshair is aimed at."""
+        if not self.cursor_visible:
+            self.selected_object = self.selector.handle_selection(self.objects)
+
     def handle_events(self, events):
         for event in events:
             if event.type == KEYDOWN and event.key == K_ESCAPE:
