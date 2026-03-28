@@ -99,12 +99,8 @@ class World:
                             self._last_click_time = 0
                             continue
 
-                    # Normal selection (includes gizmo interaction)
-                    clicked = self.selector.handle_selection(
-                        self.objects, self.selected_object
-                    )
-                    if self.selector.active_axis is not None:
-                        continue
+                    # Normal selection
+                    clicked = self.selector.handle_selection(self.objects)
 
                     self.selected_object = clicked
                     self._last_clicked_object = clicked
@@ -112,13 +108,6 @@ class World:
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 self.selector.stop_drag()
-
-            if self.selector.active_axis and self.selected_object:
-                mpos = InteractionHandler.GetMousePosition()
-                ray_o, ray_d = InteractionHandler.GetRay(mpos[0], mpos[1])
-                new_pos = self.selector.update_drag(ray_o, ray_d)
-                if new_pos is not None:
-                    self.selected_object.set_position(*new_pos)
 
     def _handle_double_click(self, obj):
         """Enter a folder on double-click; no-op for files."""

@@ -63,8 +63,6 @@ if __name__ == "__main__":
             Renderer.DrawObject(obj, world.selected_object)
         if config.get('show_axes', True):
             Renderer.DrawAxes()
-        if world.selected_object:
-            Renderer.HighlightSelectedObject(world.selected_object, world.selector)
 
         pygame.display.flip()
 
