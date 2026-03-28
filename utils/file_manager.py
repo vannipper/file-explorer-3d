@@ -3,7 +3,6 @@ FileExplorer3D - file_manager.py
 Handles folder selection via native OS dialogs.
 """
 
-import os
 from pygame.locals import *
 from utils.interaction_handler import InteractionHandler
 
@@ -18,12 +17,12 @@ class FileManager:
 
     @staticmethod
     def open_folder_dialog(config):
-        """Auto-open last folder if valid, otherwise prompt the user."""
+        """Always prompt the user, opening in the last folder if known."""
         last_folder = config.get('last_opened_folder')
-        if last_folder and os.path.isdir(last_folder):
-            return last_folder
-
-        selected = _askdirectory(title='Pick a Root Folder')
+        if last_folder:
+            selected = _askdirectory(initialdir=last_folder, title='Pick a Root Folder')
+        else:
+            selected = _askdirectory(title='Pick a Root Folder')
         if selected:
             config.set('last_opened_folder', selected)
             config.save()
