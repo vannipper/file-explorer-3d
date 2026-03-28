@@ -11,15 +11,22 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from config.config import Config
 from env.rectangular_prism import RectangularPrism
-from utils.file_manager import FileManager # TODO: implement loading a parent folder as the first action for this app
+from utils.file_manager import FileManager
 from utils.initializer import EngineInitializer
 from utils.interaction_handler import InteractionHandler
 from utils.renderer import Renderer
 
 if __name__ == "__main__":
+    
+    # load config
     config = Config()
     config.load()
-    
+
+    # load root folder
+    root_folder = FileManager.open_file_dialog(config)
+    if not root_folder:
+        exit(1)
+
     # initialize Pygame
     EngineInitializer.InitializePygame()
     clock = pygame.time.Clock()
@@ -41,9 +48,17 @@ if __name__ == "__main__":
 
         # Handle Pygame events
         events = pygame.event.get()
+        
+        new_folder = FileManager.handle_events(events, root_folder)
+        if new_folder != root_folder:
+            root_folder = new_folder
+
         run = player.handle_events(events)
         world.handle_events(events)
-        Renderer.handle_events(events)
+
+        new_size = Renderer.handle_events(events)
+        if new_size:
+            win_w, win_h = new_size
         
         # update player
         player.update(dt)

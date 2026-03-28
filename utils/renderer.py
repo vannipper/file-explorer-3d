@@ -17,7 +17,7 @@ class Renderer:
             if event.type == VIDEORESIZE:
                 InteractionHandler.ResizeWindow(*event.size)
                 return event.size
-        return 1280, 720
+        return None
 
     @staticmethod
     def SetupFrame(win_w, win_h, config):
