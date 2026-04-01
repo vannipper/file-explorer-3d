@@ -78,6 +78,7 @@ class World:
             if event.type == KEYDOWN and event.key == K_ESCAPE:
                 self.cursor_visible = True
                 pygame.mouse.set_visible(True)
+                pygame.event.set_grab(False)
                 pygame.mouse.set_pos(
                     pygame.display.get_surface().get_width() // 2,
                     pygame.display.get_surface().get_height() // 2,
@@ -95,6 +96,7 @@ class World:
                 if self.cursor_visible:
                     self.cursor_visible = False
                     pygame.mouse.set_visible(False)
+                    pygame.event.set_grab(True)
                 else:
                     now = time.time() * 1000
 
