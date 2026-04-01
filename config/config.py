@@ -14,7 +14,7 @@ class Config:
     DEFAULT_SETTINGS = {
         "mouse_sensitivity": 1.0,
         "move_speed": 5.0,
-        "last_opened_folder": None,
+        "last_opened_folder": "~",
         "window_width": 1280,
         "window_height": 720,
     }
@@ -42,7 +42,14 @@ class Config:
             print(f"Failed to save config: {e}")
 
     def get(self, key, default=None):
-        return self.settings.get(key, default)
+        value = self.settings.get(key, default)
+        if isinstance(value, str):
+            return os.path.expanduser(value)
+        return value
 
     def set(self, key, value):
+        if isinstance(value, str):
+            home = os.path.expanduser("~")
+            if value.startswith(home):
+                value = "~" + value[len(home):]
         self.settings[key] = value
