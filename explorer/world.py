@@ -105,7 +105,8 @@ class World:
                             and now - self._last_click_time < self.DOUBLE_CLICK_MS):
                         target = Selector.pick_object(self.objects)
                         if target is self._last_clicked_object:
-                            self._handle_double_click(target)
+                            if hasattr(target, 'is_dir') and target.is_dir:
+                                self.load_directory(target.file_path)
                             self._last_clicked_object = None
                             self._last_click_time = 0
                             continue
@@ -120,7 +121,3 @@ class World:
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 self.selector.stop_drag()
 
-    def _handle_double_click(self, obj):
-        """Enter a folder on double-click; no-op for files."""
-        if hasattr(obj, 'is_dir') and obj.is_dir:
-            self.load_directory(obj.file_path)
