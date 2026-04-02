@@ -28,7 +28,7 @@ if __name__ == "__main__":
     world.player = player
     world.config = config
 
-    win_w, win_h = EngineInitializer.InitializeOpenGLWindow()
+    win_w, win_h = EngineInitializer.InitializeOpenGLWindow(config)
 
     # Load initial directory
     world.load_directory(root_folder)
@@ -50,6 +50,10 @@ if __name__ == "__main__":
         new_size = Renderer.handle_events(events)
         if new_size:
             win_w, win_h = new_size
+            logical_w, logical_h = pygame.display.get_surface().get_size()
+            config.set('window_width', logical_w)
+            config.set('window_height', logical_h)
+            config.save()
 
         player.update(dt)
         world.update()

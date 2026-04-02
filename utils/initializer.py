@@ -6,7 +6,6 @@ Contains the EngineInitializer class, which handles all Pygame, OpenGL, etc. ini
 # imports
 import os
 import pygame
-import platform as sys_platform
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -36,17 +35,11 @@ class EngineInitializer:
     # self._set_app_icon("zenith_ico_DRAFT.png") # TODO: Change this path to FileExplorer3D .png
 
     @staticmethod
-    def InitializeOpenGLWindow():
-        if sys_platform.system() == "Windows":
-            import ctypes
-            work_w = ctypes.windll.user32.GetSystemMetrics(16)
-            work_h = ctypes.windll.user32.GetSystemMetrics(17)
-        else:
-            di = pygame.display.Info()
-            work_w = di.current_w
-            work_h = di.current_h - 80  # accounts for Mac menu bar + dock
+    def InitializeOpenGLWindow(config):
+        win_w = config.get('window_width', 1280)
+        win_h = config.get('window_height', 720)
 
-        pygame.display.set_mode((work_w, work_h), DOUBLEBUF | OPENGL | RESIZABLE)
+        pygame.display.set_mode((win_w, win_h), DOUBLEBUF | OPENGL | RESIZABLE)
         pygame.display.set_caption(f"FileExplorer3D {VERSION}")
         pygame.mouse.set_visible(False)
         pygame.event.set_grab(True)
