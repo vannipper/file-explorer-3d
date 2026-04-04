@@ -10,6 +10,20 @@ from utils.interaction_handler import InteractionHandler
 
 class Selector:
 
+    @staticmethod
+    def pick_object(objects):
+        """Raycast to find the clicked object."""
+        mpos = InteractionHandler.GetMousePosition()
+        ray_o, ray_d = InteractionHandler.GetRay(mpos[0], mpos[1])
+        best, min_d = None, float('inf')
+        for obj in objects:
+            dist = np.linalg.norm(np.cross(ray_d, ray_o - np.array([obj.x, obj.y, obj.z])))
+            if dist < 0.6:
+                depth = np.dot(ray_d, np.array([obj.x, obj.y, obj.z]) - ray_o)
+                if 0 < depth < min_d:
+                    min_d, best = depth, obj
+        return best
+
     def handle_selection(self, objects):
         """
         Raycast against all objects and return the one closest to the camera

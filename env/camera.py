@@ -43,6 +43,18 @@ class Camera:
         self.x += fx * forward + rx * right
         self.z += fz * forward + rz * right
 
+    def reset_to_overview(self, num_objects, cols, spacing):
+        """Position camera to see the full grid of objects."""
+        rows = max(1, math.ceil(num_objects / cols)) if num_objects > 0 else 1
+        center_x = (min(num_objects, cols) - 1) * spacing / 2
+        center_z = (rows - 1) * spacing / 2
+
+        self.x = center_x
+        self.y = max(3.0, rows * spacing * 0.5)
+        self.z = center_z + max(5.0, rows * spacing)
+        self.yaw = 0.0
+        self.pitch = -25.0
+
     def apply_look(self):
         dx, dy, dz = self.get_direction()
         eye = (self.x, self.y, self.z)
