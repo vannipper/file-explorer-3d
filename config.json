@@ -1,9 +1,11 @@
 {
   "mouse_sensitivity": 1.0,
   "move_speed": 2.0,
+  "last_opened_folder": "C:/Users/cnipper7/source/personal\\file-explorer-3d",
+  "window_width": 1280,
+  "window_height": 720,
   "show_grid": true,
   "show_axes": true,
   "fov": 70,
-  "start_fullscreen": false,
-  "last_project_path": "C:/Users/vanni/OneDrive/Documents/Zenith/ExampleProject.zenith"
+  "start_fullscreen": false
 }

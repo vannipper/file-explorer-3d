@@ -6,14 +6,12 @@ Contains the EngineInitializer class, which handles all Pygame, OpenGL, etc. ini
 # imports
 import os
 import pygame
-import platform as sys_platform
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from explorer.world import World
 from env.player import Player
 from explorer.selector import Selector
-from utils.file_manager import FileManager
 
 VERSION = "- *Development"
 
@@ -23,8 +21,6 @@ class EngineInitializer:
     @staticmethod
     def InitializePygame():
         pygame.init()
-        pygame.mouse.set_visible(False)
-        pygame.event.set_grab(True)
     
     @staticmethod
     def InitializeEngineComponents(config):
@@ -39,32 +35,24 @@ class EngineInitializer:
     # self._set_app_icon("zenith_ico_DRAFT.png") # TODO: Change this path to FileExplorer3D .png
 
     @staticmethod
-    def InitializeOpenGLWindow():
-        if sys_platform.system() == "Windows":
-            import ctypes
-            work_w = ctypes.windll.user32.GetSystemMetrics(16)
-            work_h = ctypes.windll.user32.GetSystemMetrics(17)
-        else:
-            di = pygame.display.Info()
-            work_w = di.current_w
-            work_h = di.current_h - 80  # accounts for Mac menu bar + dock
+    def InitializeOpenGLWindow(config):
+        win_w = config.get('window_width', 1280)
+        win_h = config.get('window_height', 720)
 
-        pygame.display.set_mode((work_w, work_h), DOUBLEBUF | OPENGL | RESIZABLE)
+        pygame.display.set_mode((win_w, win_h), DOUBLEBUF | OPENGL | RESIZABLE)
         pygame.display.set_caption(f"FileExplorer3D {VERSION}")
+        pygame.mouse.set_visible(False)
+        pygame.event.set_grab(True)
 
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_DEPTH_TEST)
         glClearColor(0.1, 0.1, 0.15, 1.0)
 
-        return work_w, work_h
+        # Return actual framebuffer size (differs from logical size on Retina)
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        return int(viewport[2]), int(viewport[3])
     
-    # TODO: Repurpose this to loading the last opened parent folder
-    @staticmethod
-    def load_last_project(config):
-        """Load the last opened project if it exists."""
-        last_path = config.get("last_project_path")
-
     @staticmethod
     def setAppIcon(icon_path):
         """Sets the window icon after the display mode is established."""

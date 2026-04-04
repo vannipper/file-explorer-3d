@@ -30,7 +30,9 @@ class Renderer:
         for event in events:
             if event.type == VIDEORESIZE:
                 InteractionHandler.ResizeWindow(*event.size)
-                return event.size
+                glViewport(0, 0, event.size[0], event.size[1])
+                viewport = glGetIntegerv(GL_VIEWPORT)
+                return int(viewport[2]), int(viewport[3])
         return None
 
     @staticmethod

@@ -38,6 +38,10 @@ class Player:
 
         return True
 
+    def reset_camera(self, num_objects, cols, spacing):
+        """Reset camera to an overview position for the current grid."""
+        self.camera.reset_to_overview(num_objects, cols, spacing)
+
     def update(self, dt):
         if not pygame.mouse.get_visible():
             keys = pygame.key.get_pressed()
