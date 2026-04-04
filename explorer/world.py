@@ -15,7 +15,6 @@ from utils.interaction_handler import InteractionHandler
 from utils.directory_scanner import DirectoryScanner
 
 
-
 class World:
     DOUBLE_CLICK_MS = 300
 
@@ -47,9 +46,9 @@ class World:
 
     def load_directory(self, path):
         """Scan path, populate scene, reset camera, persist to config."""
-        success = DirectoryScanner.fill_world(self, path)
+        node = make_root(path)
+        success = DirectoryScanner.fill_world_from_node(self, node)
         if not success:
-            # permission denied — flash the clicked folder red
             if self._last_clicked_object:
                 self._last_clicked_object.flash_error()
             return
@@ -81,10 +80,9 @@ class World:
         if obj is None:
             return
 
-        node = make_root(obj.file_path) if obj.is_dir else make_root(obj.file_path)
-
         print(f"\n── {obj.file_name}")
         if obj.is_dir:
+            node = make_root(obj.file_path)
             node.expand()
             self._print_tree(node, prefix="   ")
         print()
@@ -124,7 +122,6 @@ class World:
                 else:
                     now = time.time() * 1000
 
-                    # Check double-click BEFORE gizmo can intercept
                     if (self._last_clicked_object is not None
                             and now - self._last_click_time < self.DOUBLE_CLICK_MS):
                         target = Selector.pick_object(self.objects)
@@ -135,7 +132,6 @@ class World:
                             self._last_click_time = 0
                             continue
 
-                    # Normal selection
                     clicked = self.selector.handle_selection(self.objects)
 
                     self.selected_object = clicked
@@ -146,4 +142,3 @@ class World:
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 self.selector.stop_drag()
-
