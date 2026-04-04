@@ -11,7 +11,7 @@ from OpenGL.GL import *
 
 from explorer.selector import Selector
 from explorer.file_tree_node import make_root
-from utils.interaction_handler import InteractionHandler
+from explorer.file_index import FileIndex
 from utils.directory_scanner import DirectoryScanner
 
 
@@ -33,6 +33,8 @@ class World:
         self._last_click_time = 0
         self._last_clicked_object = None
 
+        self.file_index = FileIndex()
+
     def add_object(self, obj):
         self.objects.append(obj)
 
@@ -40,6 +42,7 @@ class World:
         """Remove all objects and reset selection."""
         self.objects = []
         self.selected_object = None
+        self.file_index.clear()
         self.selector.stop_drag()
         self._last_click_time = 0
         self._last_clicked_object = None
@@ -52,6 +55,8 @@ class World:
             if self._last_clicked_object:
                 self._last_clicked_object.flash_error()
             return
+
+        self.file_index.build(self.objects)
 
         if self.config:
             self.config.set('last_opened_folder', path)
@@ -66,6 +71,7 @@ class World:
         self.selected_object = None
 
     def delete_object(self, obj):
+        self.file_index.delete(obj.file_name, obj.file_path)
         self.objects.remove(obj)
         self.deselect_object()
 
