@@ -10,7 +10,8 @@ from pygame.locals import *
 from OpenGL.GL import *
 
 from explorer.selector import Selector
-from utils.interaction_handler import InteractionHandler
+from explorer.file_tree_node import make_root
+from explorer.file_index import FileIndex
 from utils.directory_scanner import DirectoryScanner
 
 
@@ -32,6 +33,8 @@ class World:
         self._last_click_time = 0
         self._last_clicked_object = None
 
+        self.file_index = FileIndex()
+
     def add_object(self, obj):
         self.objects.append(obj)
 
@@ -39,18 +42,21 @@ class World:
         """Remove all objects and reset selection."""
         self.objects = []
         self.selected_object = None
+        self.file_index.clear()
         self.selector.stop_drag()
         self._last_click_time = 0
         self._last_clicked_object = None
 
     def load_directory(self, path):
         """Scan path, populate scene, reset camera, persist to config."""
-        success = DirectoryScanner.fill_world(self, path)
+        node = make_root(path)
+        success = DirectoryScanner.fill_world_from_node(self, node)
         if not success:
-            # permission denied — flash the clicked folder red
             if self._last_clicked_object:
                 self._last_clicked_object.flash_error()
             return
+
+        self.file_index.build(self.objects)
 
         if self.config:
             self.config.set('last_opened_folder', path)
@@ -65,13 +71,36 @@ class World:
         self.selected_object = None
 
     def delete_object(self, obj):
+        self.file_index.delete(obj.file_name, obj.file_path)
         self.objects.remove(obj)
         self.deselect_object()
 
     def update(self):
-        """Called every frame. Highlights whichever object the crosshair is aimed at."""
+        """Per-frame hover-selection: highlight whichever object the crosshair aims at."""
         if not self.cursor_visible:
             self.selected_object = self.selector.handle_selection(self.objects)
+
+    def _activate_selected(self):
+        """Called on click. Prints the file tree rooted at the selected object."""
+        obj = self.selected_object
+        if obj is None:
+            return
+
+        print(f"\n── {obj.file_name}")
+        if obj.is_dir:
+            node = make_root(obj.file_path)
+            node.expand()
+            self._print_tree(node, prefix="   ")
+        print()
+
+    def _print_tree(self, node, prefix=""):
+        children = node.get_children()
+        for i, child in enumerate(children):
+            connector = "└── " if i == len(children) - 1 else "├── "
+            print(f"{prefix}{connector}{child.name}")
+            if child.is_dir:
+                extension = "    " if i == len(children) - 1 else "│   "
+                self._print_tree(child, prefix + extension)
 
     def handle_events(self, events):
         for event in events:
@@ -96,11 +125,9 @@ class World:
                 if self.cursor_visible:
                     self.cursor_visible = False
                     pygame.mouse.set_visible(False)
-                    pygame.event.set_grab(True)
                 else:
                     now = time.time() * 1000
 
-                    # Check double-click BEFORE gizmo can intercept
                     if (self._last_clicked_object is not None
                             and now - self._last_click_time < self.DOUBLE_CLICK_MS):
                         target = Selector.pick_object(self.objects)
@@ -111,13 +138,13 @@ class World:
                             self._last_click_time = 0
                             continue
 
-                    # Normal selection
                     clicked = self.selector.handle_selection(self.objects)
 
                     self.selected_object = clicked
                     self._last_clicked_object = clicked
                     self._last_click_time = now
+                    self._activate_selected()
+                    pygame.event.set_grab(True)
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 self.selector.stop_drag()
-

@@ -39,7 +39,6 @@ if __name__ == "__main__":
         dt = clock.tick(60) / 1000.0
         events = pygame.event.get()
 
-        # Ctrl+O: open a new folder
         new_folder = FileManager.handle_events(events, world.current_directory, config)
         if new_folder != world.current_directory:
             world.load_directory(new_folder)
@@ -75,3 +74,4 @@ if __name__ == "__main__":
         pygame.display.flip()
 
     pygame.quit()
+    
