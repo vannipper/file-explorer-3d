@@ -63,7 +63,7 @@ class World:
             self.config.save()
 
         if self.player:
-            self.player.reset_camera(
+            self.player.start_navigation_animation(
                 len(self.objects), DirectoryScanner.COLS, DirectoryScanner.SPACING
             )
 
