@@ -69,6 +69,12 @@ if __name__ == "__main__":
             Renderer.DrawAxes()
 
         Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
+        if world.selected_object:
+            meta = world.metadata_cache.get(world.selected_object.file_path)
+            Renderer.DrawInfoPanel(world.selected_object, meta, win_w, win_h)
+        if world.show_hover_tooltip and world.selected_object:
+            meta = world.metadata_cache.get_if_cached(world.selected_object.file_path)
+            Renderer.DrawHoverTooltip(world.selected_object, meta, win_w, win_h)
         Renderer.DrawCrosshair(win_w, win_h)
 
         pygame.display.flip()
