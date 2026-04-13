@@ -14,7 +14,7 @@ from explorer.file_tree_node import make_root
 from explorer.file_index import FileIndex
 from utils.directory_scanner import DirectoryScanner
 from utils.metadata_cache import MetadataCache
-
+from utils.navigation_stack import NavigationStack
 
 class World:
     DOUBLE_CLICK_MS = 300
@@ -36,6 +36,9 @@ class World:
 
         self.file_index = FileIndex()
 
+        # navigation history (Unit 7 — Stacks)
+        self.nav_stack = NavigationStack()
+
         # metadata cache (Unit 11 — Dicts)
         self.metadata_cache = MetadataCache()
 
@@ -56,14 +59,22 @@ class World:
         self._last_click_time = 0
         self._last_clicked_object = None
 
-    def load_directory(self, path):
-        """Scan path, populate scene, reset camera, persist to config."""
+    def load_directory(self, path, push_nav=True):
+        """Scan path, populate scene, reset camera, persist to config.
+
+        push_nav=False is used internally by go_back/go_forward so that
+        the navigation stack is not updated a second time (the stack
+        already moved current_path before calling this method).
+        """
         node = make_root(path)
         success = DirectoryScanner.fill_world_from_node(self, node)
         if not success:
             if self._last_clicked_object:
                 self._last_clicked_object.flash_error()
             return
+
+        if push_nav:
+            self.nav_stack.navigate_to(path)
 
         self.file_index.build(self.objects)
 
@@ -138,11 +149,16 @@ class World:
                 self.deselect_object()
                 self.selector.stop_drag()
 
-            elif event.type == KEYDOWN and event.key == K_BACKSPACE:
-                if self.current_directory and not self.cursor_visible:
-                    parent = os.path.dirname(self.current_directory)
-                    if parent != self.current_directory:
-                        self.load_directory(parent)
+            elif event.type == KEYDOWN and not self.cursor_visible:
+                alt = pygame.key.get_mods() & KMOD_ALT
+                if event.key == K_BACKSPACE or (event.key == K_LEFT and alt):
+                    path = self.nav_stack.go_back()
+                    if path:
+                        self.load_directory(path, push_nav=False)
+                elif event.key == K_RIGHT and alt:
+                    path = self.nav_stack.go_forward()
+                    if path:
+                        self.load_directory(path, push_nav=False)
 
             elif event.type == MOUSEBUTTONDOWN and event.button == 1:
                 if self.cursor_visible:

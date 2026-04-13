@@ -149,6 +149,79 @@ class Renderer:
         glMatrixMode(GL_MODELVIEW);  glPopMatrix()
 
     @staticmethod
+    def DrawNavArrows(nav_stack, win_w, win_h):
+        """Render back (◄) and forward (►) arrows in the top-left HUD.
+
+        Active arrows are drawn white; unavailable ones are drawn dark grey.
+        Uses the same font/texture pipeline as DrawSelectedLabel.
+        """
+        back_color    = (255, 255, 255) if nav_stack.can_go_back()    else (60, 60, 60)
+        forward_color = (255, 255, 255) if nav_stack.can_go_forward()  else (60, 60, 60)
+
+        font = Renderer._get_font()
+        pad  = 8
+        margin = 12
+        gap    = 6   # horizontal gap between the two arrows
+
+        back_surf    = font.render("◄", True, back_color)
+        forward_surf = font.render("►", True, forward_color)
+
+        bw, bh = back_surf.get_size()
+        fw, fh = forward_surf.get_size()
+        h      = max(bh, fh)
+
+        # composite onto one surface: [pad] ◄ [gap] ► [pad]
+        total_w = pad + bw + gap + fw + pad
+        total_h = h + pad * 2
+
+        bg = pygame.Surface((total_w, total_h), pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 140))
+        bg.blit(back_surf,    (pad,              pad + (h - bh) // 2))
+        bg.blit(forward_surf, (pad + bw + gap,   pad + (h - fh) // 2))
+        bg = pygame.transform.flip(bg, False, True)
+        raw = pygame.image.tostring(bg, "RGBA", False)
+
+        tex_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     total_w, total_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw)
+
+        # position: top-left corner (OpenGL y=0 is bottom, so flip)
+        x0 = margin
+        y0 = win_h - margin - total_h
+        x1, y1 = x0 + total_w, y0 + total_h
+
+        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
+        glOrtho(0, win_w, 0, win_h, -1, 1)
+        glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity()
+
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_LIGHTING)
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        glColor4f(1, 1, 1, 1)
+        glBegin(GL_QUADS)
+        glTexCoord2f(0, 0); glVertex2f(x0, y0)
+        glTexCoord2f(1, 0); glVertex2f(x1, y0)
+        glTexCoord2f(1, 1); glVertex2f(x1, y1)
+        glTexCoord2f(0, 1); glVertex2f(x0, y1)
+        glEnd()
+
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glDeleteTextures([tex_id])   # free GPU texture each frame (small, changes often)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+
+        glMatrixMode(GL_PROJECTION); glPopMatrix()
+        glMatrixMode(GL_MODELVIEW);  glPopMatrix()
+
+    @staticmethod
     def DrawSelectedLabel(selected_object, win_w, win_h):
         """Render the selected object's file name as a 2D HUD label."""
         if selected_object is None:
