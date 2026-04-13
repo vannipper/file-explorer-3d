@@ -13,8 +13,8 @@ from explorer.selector import Selector
 from explorer.file_tree_node import make_root
 from explorer.file_index import FileIndex
 from utils.directory_scanner import DirectoryScanner
+from utils.metadata_cache import MetadataCache
 from utils.navigation_stack import NavigationStack
-
 
 class World:
     DOUBLE_CLICK_MS = 300
@@ -38,6 +38,14 @@ class World:
 
         # navigation history (Unit 7 — Stacks)
         self.nav_stack = NavigationStack()
+
+        # metadata cache (Unit 11 — Dicts)
+        self.metadata_cache = MetadataCache()
+
+        # hover tooltip tracking
+        self._hover_object = None
+        self._hover_start  = 0.0
+        self.show_hover_tooltip = False
 
     def add_object(self, obj):
         self.objects.append(obj)
@@ -90,7 +98,21 @@ class World:
     def update(self):
         """Per-frame hover-selection: highlight whichever object the crosshair aims at."""
         if not self.cursor_visible:
-            self.selected_object = self.selector.handle_selection(self.objects)
+            newly_selected = self.selector.handle_selection(self.objects)
+
+            # Track how long the crosshair has rested on the same object.
+            # After 500 ms of stable hover, flag the tooltip for display.
+            if newly_selected is not self._hover_object:
+                self._hover_object      = newly_selected
+                self._hover_start       = time.time()
+                self.show_hover_tooltip = False
+            elif newly_selected is not None and not self.show_hover_tooltip:
+                if time.time() - self._hover_start >= 0.5:
+                    self.show_hover_tooltip = True
+
+            self.selected_object = newly_selected
+        else:
+            self.show_hover_tooltip = False
 
     def _activate_selected(self):
         """Called on click. Prints the file tree rooted at the selected object."""

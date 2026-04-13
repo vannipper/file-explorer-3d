@@ -5,6 +5,7 @@ Scans a directory and populates the World with FileObjects.
 
 from explorer.file_object import FileObject
 from explorer.file_tree_node import FileTreeNode, make_root
+from utils.metadata_cache import MetadataCache
 
 
 class DirectoryScanner:
@@ -40,6 +41,9 @@ class DirectoryScanner:
 
             obj.set_position(x, y, z)
             world.add_object(obj)
+
+        if hasattr(world, 'metadata_cache') and isinstance(world.metadata_cache, MetadataCache):
+            world.metadata_cache.preload([obj.file_path for obj in world.objects])
 
         print(f"DirectoryScanner: Spawned {len(children)} object(s) from '{node.path}'")
         return True
