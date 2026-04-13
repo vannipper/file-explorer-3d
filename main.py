@@ -68,6 +68,7 @@ if __name__ == "__main__":
         if config.get('show_axes', True):
             Renderer.DrawAxes()
 
+        Renderer.DrawNavArrows(world.nav_stack, win_w, win_h)
         Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
         Renderer.DrawCrosshair(win_w, win_h)
 

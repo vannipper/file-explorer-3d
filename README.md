@@ -18,4 +18,4 @@ python main.py
 ```
 
 ## Algorithm Implementations
-The following section describes each of the units involved in the Python version of the **SSE 554** course and how content from each unit is used.
+The following section describes each of the units involved in the Python version of the **SSE 554** course and how content from each unit is used
