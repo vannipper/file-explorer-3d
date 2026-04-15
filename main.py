@@ -29,6 +29,8 @@ if __name__ == "__main__":
     world.config = config
 
     win_w, win_h = EngineInitializer.InitializeOpenGLWindow(config)
+    _surf = pygame.display.get_surface()
+    win_w, win_h = _surf.get_width(), _surf.get_height()
 
     # Load initial directory
     world.load_directory(root_folder)
@@ -54,7 +56,7 @@ if __name__ == "__main__":
             config.set('window_height', logical_h)
             config.save()
 
-        player.update(dt)
+        player.update(dt, win_w, win_h)
         world.update()
 
         # Rendering
@@ -81,4 +83,3 @@ if __name__ == "__main__":
         pygame.display.flip()
 
     pygame.quit()
-    
