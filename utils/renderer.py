@@ -59,9 +59,11 @@ class Renderer:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
 
-        glEnable(GL_LIGHTING); glEnable(GL_LIGHT0); glEnable(GL_COLOR_MATERIAL)
+        glEnable(GL_LIGHTING); glEnable(GL_COLOR_MATERIAL)
         glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-        glLightfv(GL_LIGHT0, GL_POSITION, [5, 10, 5, 1])
+        
+        # Set ambient light to maximum for uniform illumination everywhere
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [1.0, 1.0, 1.0, 1.0])
 
         glMatrixMode(GL_PROJECTION); glLoadIdentity()
         aspect = win_w / win_h if win_h > 0 else 1
