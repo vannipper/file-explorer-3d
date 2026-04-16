@@ -427,19 +427,19 @@ class Renderer:
 
         glEnable(GL_LIGHTING)
 
-        # Hovered mini-cube name label
+        # Hovered mini-cube name label — shown above the grid
         if hovered_name:
             size_buf = [0, 0]
             tex = Renderer._upload_single_line_texture(hovered_name, size_buf)
             if tex:
                 lw, lh = size_buf
                 px, py = Renderer._world_to_screen(
-                    obj.x, base_y + rows * CUBE_GAP + 0.05, obj.z, win_w, win_h)
+                    obj.x, base_y + rows * CUBE_GAP + 0.35, obj.z, win_w, win_h)
                 if px is not None:
                     Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
                 glDeleteTextures([tex])
 
-        # Overflow label
+        # Overflow label — shown below the grid so it never collides with the name label
         overflow = len(children) - MAX_ITEMS
         if overflow > 0:
             label = f"+ {overflow} more"
@@ -448,7 +448,7 @@ class Renderer:
             if tex:
                 lw, lh = size_buf
                 px, py = Renderer._world_to_screen(
-                    obj.x, base_y + rows * CUBE_GAP + 0.1, obj.z, win_w, win_h)
+                    obj.x, base_y - 0.3, obj.z, win_w, win_h)
                 if px is not None:
                     Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
                 glDeleteTextures([tex])

@@ -12,7 +12,9 @@ from OpenGL.GL import *
 from explorer.selector import Selector
 from explorer.file_tree_node import make_root
 from explorer.file_index import FileIndex
+import numpy as np
 from utils.directory_scanner import DirectoryScanner
+from utils.interaction_handler import InteractionHandler
 from utils.metadata_cache import MetadataCache
 from utils.navigation_stack import NavigationStack
 
@@ -27,8 +29,6 @@ def _pick_preview_cube(folder_obj, children):
     Mirrors the layout constants in Renderer.DrawDirectoryPreview exactly so
     the hit-test matches what is drawn.
     """
-    from utils.interaction_handler import InteractionHandler
-    import numpy as np
 
     MAX_ITEMS  = 30
     COLS       = 6
@@ -170,8 +170,10 @@ class World:
                 if time.time() - self._hover_start >= 0.5:
                     self.show_hover_tooltip = True
 
-            # Lazily scan a hovered directory's children once.
-            if (newly_selected is not None
+            # Lazily scan a hovered directory's children once the crosshair
+            # has rested on it for 500 ms (same gate as show_hover_tooltip).
+            if (self.show_hover_tooltip
+                    and newly_selected is not None
                     and newly_selected.is_dir
                     and self.hover_preview_children is None
                     and newly_selected.file_path != self._hover_preview_path):
@@ -272,6 +274,7 @@ class World:
                     self.selected_object = clicked
                     self._last_clicked_object = clicked
                     self._last_click_time = now
+                    self._activate_selected()
                     pygame.event.set_grab(True)
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:

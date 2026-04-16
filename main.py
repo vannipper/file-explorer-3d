@@ -73,7 +73,10 @@ if __name__ == "__main__":
         if world.selected_object:
             meta = world.metadata_cache.get(world.selected_object.file_path)
             Renderer.DrawInfoPanel(world.selected_object, meta, win_w, win_h)
-        if world.selected_object and world.hover_preview_children:
+        if world.show_hover_tooltip and world.selected_object and not world.selected_object.is_dir:
+            meta = world.metadata_cache.get_if_cached(world.selected_object.file_path)
+            Renderer.DrawHoverTooltip(world.selected_object, meta, win_w, win_h)
+        if world.selected_object and world.hover_preview_children is not None:
             Renderer.DrawDirectoryPreview(
                 world.selected_object,
                 world.hover_preview_children,
