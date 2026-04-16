@@ -29,6 +29,24 @@ class Renderer:
     _hover_tooltip_text = None
     _hover_tooltip_size = (0, 0)
 
+    # ── directory preview palette (mirrors file_object.py) ─────────────────
+    _EXT_COLORS = {
+        ".py":   (0.2, 0.9, 0.3),  ".js":   (0.9, 0.85, 0.2),
+        ".ts":   (0.2, 0.5, 0.9),  ".html": (0.9, 0.4, 0.1),
+        ".css":  (0.3, 0.6, 1.0),  ".cpp":  (0.6, 0.3, 0.9),
+        ".c":    (0.5, 0.3, 0.8),  ".h":    (0.7, 0.4, 0.9),
+        ".txt":  (0.9, 0.9, 0.9),  ".md":   (0.8, 0.8, 0.7),
+        ".pdf":  (0.9, 0.1, 0.1),  ".json": (0.9, 0.7, 0.2),
+        ".yaml": (0.9, 0.7, 0.2),  ".yml":  (0.9, 0.7, 0.2),
+        ".xml":  (0.7, 0.5, 0.2),  ".png":  (0.9, 0.8, 0.2),
+        ".jpg":  (0.9, 0.75, 0.2), ".jpeg": (0.9, 0.75, 0.2),
+        ".gif":  (0.9, 0.6, 0.7),  ".svg":  (0.4, 0.9, 0.8),
+        ".zip":  (0.6, 0.4, 0.2),  ".tar":  (0.6, 0.4, 0.2),
+        ".gz":   (0.5, 0.35, 0.15),
+    }
+    _FOLDER_COLOR  = (0.15, 0.3, 0.8)
+    _DEFAULT_COLOR = (0.65, 0.65, 0.65)
+
     @staticmethod
     def _get_font():
         if Renderer._font is None:
@@ -360,6 +378,83 @@ class Renderer:
         y0 = cy + 30           # 30 px above centre in GL ortho coords (y-up)
         Renderer._draw_textured_quad(Renderer._hover_tooltip_texture_id, x0, y0, lw, lh, win_w, win_h)
 
+    @staticmethod
+    def DrawDirectoryPreview(obj, children, win_w, win_h, hovered_name=None):
+        """
+        Render a floating mini-grid of coloured cubes above a hovered directory.
+        Up to MAX_ITEMS entries shown in a COLS-wide grid. If the crosshair
+        is over a cube, its name is shown in a label above the grid.
+        An overflow count is shown if the directory has more than MAX_ITEMS entries.
+        """
+        if obj is None:
+            return
+
+        MAX_ITEMS = 30
+        COLS      = 6
+        CUBE_SIZE = 0.18
+        CUBE_GAP  = 0.46
+        LIFT      = 0.55
+
+        base_y  = obj.y + obj.height / 2 + LIFT + CUBE_SIZE
+        grid_w  = COLS * CUBE_GAP
+        start_x = obj.x - grid_w / 2 + CUBE_GAP / 2
+        start_z = obj.z
+
+        shown = children[:MAX_ITEMS]
+        rows  = max(1, -(-len(shown) // COLS))  # ceiling division
+
+        glDisable(GL_LIGHTING)
+        glEnable(GL_DEPTH_TEST)
+
+        if not shown:
+            label = "(empty)"
+            size_buf = [0, 0]
+            tex = Renderer._upload_single_line_texture(label, size_buf)
+            if tex:
+                lw, lh = size_buf
+                px, py = Renderer._world_to_screen(obj.x, base_y, obj.z, win_w, win_h)
+                if px is not None:
+                    Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
+                glDeleteTextures([tex])
+            glEnable(GL_LIGHTING)
+            return
+
+        for i, entry in enumerate(shown):
+            col = i % COLS
+            row = i // COLS
+            cx  = start_x + col * CUBE_GAP
+            cy  = base_y  + row * CUBE_GAP
+            r, g, b = Renderer._preview_color(entry)
+            Renderer._draw_mini_cube(cx, cy, start_z, CUBE_SIZE, r, g, b)
+
+        glEnable(GL_LIGHTING)
+
+        # Hovered mini-cube name label — shown above the grid
+        if hovered_name:
+            size_buf = [0, 0]
+            tex = Renderer._upload_single_line_texture(hovered_name, size_buf)
+            if tex:
+                lw, lh = size_buf
+                px, py = Renderer._world_to_screen(
+                    obj.x, base_y + rows * CUBE_GAP + 0.35, obj.z, win_w, win_h)
+                if px is not None:
+                    Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
+                glDeleteTextures([tex])
+
+        # Overflow label — shown below the grid so it never collides with the name label
+        overflow = len(children) - MAX_ITEMS
+        if overflow > 0:
+            label = f"+ {overflow} more"
+            size_buf = [0, 0]
+            tex = Renderer._upload_single_line_texture(label, size_buf)
+            if tex:
+                lw, lh = size_buf
+                px, py = Renderer._world_to_screen(
+                    obj.x, base_y - 0.3, obj.z, win_w, win_h)
+                if px is not None:
+                    Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
+                glDeleteTextures([tex])
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -475,3 +570,88 @@ class Renderer:
 
         glMatrixMode(GL_PROJECTION); glPopMatrix()
         glMatrixMode(GL_MODELVIEW);  glPopMatrix()
+
+    @staticmethod
+    def _preview_color(entry):
+        """Return RGB color for a DirEntry (file or directory)."""
+        if entry.is_dir(follow_symlinks=False):
+            return Renderer._FOLDER_COLOR
+
+        name = entry.name.lower()
+        for ext, color in Renderer._EXT_COLORS.items():
+            if name.endswith(ext):
+                return color
+        return Renderer._DEFAULT_COLOR
+
+    @staticmethod
+    def _draw_mini_cube(x, y, z, size, r, g, b):
+        """Draw a small cube at world position (x, y, z)."""
+        glPushMatrix()
+        glTranslatef(x, y, z)
+        glColor3f(r, g, b)
+
+        glBegin(GL_TRIANGLES)
+        # Front face
+        glVertex3f(-size, -size,  size)
+        glVertex3f( size, -size,  size)
+        glVertex3f( size,  size,  size)
+        glVertex3f(-size, -size,  size)
+        glVertex3f( size,  size,  size)
+        glVertex3f(-size,  size,  size)
+        # Back face
+        glVertex3f(-size, -size, -size)
+        glVertex3f(-size,  size, -size)
+        glVertex3f( size,  size, -size)
+        glVertex3f(-size, -size, -size)
+        glVertex3f( size,  size, -size)
+        glVertex3f( size, -size, -size)
+        # Top face
+        glVertex3f(-size,  size, -size)
+        glVertex3f(-size,  size,  size)
+        glVertex3f( size,  size,  size)
+        glVertex3f(-size,  size, -size)
+        glVertex3f( size,  size,  size)
+        glVertex3f( size,  size, -size)
+        # Bottom face
+        glVertex3f(-size, -size, -size)
+        glVertex3f( size, -size, -size)
+        glVertex3f( size, -size,  size)
+        glVertex3f(-size, -size, -size)
+        glVertex3f( size, -size,  size)
+        glVertex3f(-size, -size,  size)
+        # Right face
+        glVertex3f( size, -size, -size)
+        glVertex3f( size,  size, -size)
+        glVertex3f( size,  size,  size)
+        glVertex3f( size, -size, -size)
+        glVertex3f( size,  size,  size)
+        glVertex3f( size, -size,  size)
+        # Left face
+        glVertex3f(-size, -size, -size)
+        glVertex3f(-size, -size,  size)
+        glVertex3f(-size,  size,  size)
+        glVertex3f(-size, -size, -size)
+        glVertex3f(-size,  size,  size)
+        glVertex3f(-size,  size, -size)
+        glEnd()
+
+        glPopMatrix()
+
+    @staticmethod
+    def _world_to_screen(wx, wy, wz, win_w, win_h):
+        """
+        Convert world coordinates to screen coordinates using the current
+        projection and modelview matrices. Returns (screen_x, screen_y) or
+        None if the point is behind the camera or projection fails.
+        """
+        modelview = glGetDoublev(GL_MODELVIEW_MATRIX)
+        projection = glGetDoublev(GL_PROJECTION_MATRIX)
+        viewport = glGetIntegerv(GL_VIEWPORT)
+
+        result = gluProject(wx, wy, wz, modelview, projection, viewport)
+        if result is None:
+            return None
+
+        sx, sy, sz = result
+        sy = win_h - sy
+        return (sx, sy)

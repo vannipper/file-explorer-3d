@@ -12,9 +12,59 @@ from OpenGL.GL import *
 from explorer.selector import Selector
 from explorer.file_tree_node import make_root
 from explorer.file_index import FileIndex
+import numpy as np
 from utils.directory_scanner import DirectoryScanner
+from utils.interaction_handler import InteractionHandler
 from utils.metadata_cache import MetadataCache
 from utils.navigation_stack import NavigationStack
+
+
+# ── module-level helper (no GL imports needed) ────────────────────────────
+
+def _pick_preview_cube(folder_obj, children):
+    """
+    Raycast from the crosshair against the mini preview cube grid above
+    folder_obj.  Returns the name of the hit entry, or None.
+
+    Mirrors the layout constants in Renderer.DrawDirectoryPreview exactly so
+    the hit-test matches what is drawn.
+    """
+
+    MAX_ITEMS  = 30
+    COLS       = 6
+    CUBE_SIZE  = 0.18
+    CUBE_GAP   = 0.46
+    LIFT       = 0.55
+
+    base_y  = folder_obj.y + folder_obj.height / 2 + LIFT + CUBE_SIZE
+    grid_w  = COLS * CUBE_GAP
+    start_x = folder_obj.x - grid_w / 2 + CUBE_GAP / 2
+    start_z = folder_obj.z
+
+    mpos = InteractionHandler.GetMousePosition()
+    ray_o, ray_d = InteractionHandler.GetRay(mpos[0], mpos[1])
+
+    shown   = children[:MAX_ITEMS]
+    best    = None
+    min_d   = float("inf")
+    HIT_R   = CUBE_SIZE * 1.6   # slightly generous hit radius
+
+    for i, entry in enumerate(shown):
+        col = i % COLS
+        row = i // COLS
+        cx  = start_x + col * CUBE_GAP
+        cy  = base_y  + row * CUBE_GAP
+        cz  = start_z
+
+        cube_pos = np.array([cx, cy, cz])
+        dist = np.linalg.norm(np.cross(ray_d, ray_o - cube_pos))
+        if dist < HIT_R:
+            depth = np.dot(ray_d, cube_pos - ray_o)
+            if 0 < depth < min_d:
+                min_d = depth
+                best  = entry.name
+
+    return best
 
 class World:
     DOUBLE_CLICK_MS = 300
@@ -46,6 +96,12 @@ class World:
         self._hover_object = None
         self._hover_start  = 0.0
         self.show_hover_tooltip = False
+
+        # directory preview (mini 3-D grid shown above a hovered folder)
+        self.hover_preview_children: list | None = None
+        self._hover_preview_path: str | None = None
+        # name of the mini-cube currently under the crosshair (or None)
+        self.hover_preview_name: str | None = None
 
     def add_object(self, obj):
         self.objects.append(obj)
@@ -106,13 +162,49 @@ class World:
                 self._hover_object      = newly_selected
                 self._hover_start       = time.time()
                 self.show_hover_tooltip = False
+                # Reset preview when crosshair leaves a folder
+                self.hover_preview_children = None
+                self._hover_preview_path    = None
+                self.hover_preview_name     = None
             elif newly_selected is not None and not self.show_hover_tooltip:
                 if time.time() - self._hover_start >= 0.5:
                     self.show_hover_tooltip = True
 
+            # Lazily scan a hovered directory's children once the crosshair
+            # has rested on it for 500 ms (same gate as show_hover_tooltip).
+            if (self.show_hover_tooltip
+                    and newly_selected is not None
+                    and newly_selected.is_dir
+                    and self.hover_preview_children is None
+                    and newly_selected.file_path != self._hover_preview_path):
+                try:
+                    raw = [e for e in os.scandir(newly_selected.file_path)
+                            if not e.name.startswith(".")]
+                    dirs  = sorted([e for e in raw if     e.is_dir(follow_symlinks=False)],
+                                    key=lambda e: e.name.lower())
+                    files = sorted([e for e in raw if not e.is_dir(follow_symlinks=False)],
+                                    key=lambda e: e.name.lower())
+                    self.hover_preview_children = dirs + files
+                except PermissionError:
+                    self.hover_preview_children = []
+                self._hover_preview_path = newly_selected.file_path
+
+            # Raycast against mini preview cubes to find which one the
+            # crosshair is aimed at, and expose its name for the tooltip.
+            if (newly_selected is not None
+                    and newly_selected.is_dir
+                    and self.hover_preview_children):
+                self.hover_preview_name = _pick_preview_cube(
+                    newly_selected,
+                    self.hover_preview_children,
+                )
+            else:
+                self.hover_preview_name = None
+
             self.selected_object = newly_selected
         else:
             self.show_hover_tooltip = False
+            self.hover_preview_name = None
 
     def _activate_selected(self):
         """Called on click. Prints the file tree rooted at the selected object."""
