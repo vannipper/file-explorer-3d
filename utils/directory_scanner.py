@@ -18,13 +18,15 @@ class DirectoryScanner:
         """Clear the world and populate it from a FileTreeNode.
         Returns True on success, False on permission error.
         """
-        world.clear()
         children = node.get_children()
 
+        if node.access_denied:
+            print("access denied") # TODO: make this a visual cube within the program
+            return False
+
+        world.clear()
+
         if not children:
-            if node.access_denied:
-                print("access denied") # TODO: make this a visual cube within the program
-                return False
             return True
 
         world.current_directory = node.path
