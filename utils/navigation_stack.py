@@ -77,8 +77,6 @@ class NavigationStack:
         self.current_path = self.forward_stack.pop()
         return self.current_path
 
-    # ─── predicates ─────────────────────────────────────────────────────────
-
     def can_go_back(self) -> bool:
         """O(1) — len() on a Python list."""
         return len(self.back_stack) > 0

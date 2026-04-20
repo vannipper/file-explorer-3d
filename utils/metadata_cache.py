@@ -139,10 +139,6 @@ class MetadataCache:
         """Flush the entire cache. O(n)."""
         self._cache.clear()
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
     def _stat(self, path: str) -> Optional[FileMetadata]:
         """
         Call os.lstat() and build a FileMetadata. Returns None on any OS error.

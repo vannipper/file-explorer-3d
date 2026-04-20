@@ -206,19 +206,6 @@ class World:
             self.show_hover_tooltip = False
             self.hover_preview_name = None
 
-    def _activate_selected(self):
-        """Called on click. Prints the file tree rooted at the selected object."""
-        obj = self.selected_object
-        if obj is None:
-            return
-
-        print(f"\n── {obj.file_name}")
-        if obj.is_dir:
-            node = make_root(obj.file_path)
-            node.expand()
-            self._print_tree(node, prefix="   ")
-        print()
-
     def _print_tree(self, node, prefix=""):
         children = node.get_children()
         for i, child in enumerate(children):
@@ -274,7 +261,6 @@ class World:
                     self.selected_object = clicked
                     self._last_clicked_object = clicked
                     self._last_click_time = now
-                    self._activate_selected()
                     pygame.event.set_grab(True)
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
