@@ -27,8 +27,14 @@ if __name__ == "__main__":
     world, player, selector, _ = EngineInitializer.InitializeEngineComponents(config)
     world.player = player
     world.config = config
+    world.load_bookmarks_from_config()
 
     win_w, win_h = EngineInitializer.InitializeOpenGLWindow(config)
+
+    if world.bookmarks_panel_visible:
+        world.cursor_visible = True
+        pygame.mouse.set_visible(True)
+        pygame.event.set_grab(False)
 
     # Load initial directory
     world.load_directory(root_folder)
@@ -64,12 +70,13 @@ if __name__ == "__main__":
         if config.get('show_grid', True):
             Renderer.DrawGrid()
         for obj in world.objects:
-            Renderer.DrawObject(obj, world.selected_object)
+            Renderer.DrawObject(obj, world.selected_object, world.is_bookmarked(obj.file_path))
         if config.get('show_axes', True):
             Renderer.DrawAxes()
 
         Renderer.DrawNavArrows(world.nav_stack, win_w, win_h)
         Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
+        Renderer.DrawBookmarksPanel(world, win_w, win_h)
         if world.selected_object:
             meta = world.metadata_cache.get(world.selected_object.file_path)
             Renderer.DrawInfoPanel(world.selected_object, meta, win_w, win_h)
@@ -87,4 +94,5 @@ if __name__ == "__main__":
 
         pygame.display.flip()
 
+    world.sync_bookmarks_to_config()
     pygame.quit()

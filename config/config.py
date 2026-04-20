@@ -17,6 +17,7 @@ class Config:
         "last_opened_folder": "~",
         "window_width": 1280,
         "window_height": 720,
+        "bookmarks": [],
     }
 
     def __init__(self):
