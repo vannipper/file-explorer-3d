@@ -38,17 +38,26 @@ ERROR_COLOR   = (0.9, 0.1, 0.1)
 
 HIGHLIGHT_COLOR = (1.0, 0.85, 0.2)  # warm yellow tint when selected
 HIGHLIGHT_BLEND = 0.5               # 0 = original, 1 = full highlight
+BOOKMARK_COLOR = (1.0, 0.82, 0.25)
+BOOKMARK_BLEND = 0.22
 
 
-def _tint(color, selected: bool):
-    """Lerp color toward HIGHLIGHT_COLOR when selected."""
-    if not selected:
-        return color
+def _blend(color, target, amount):
     return (
-        color[0] + (HIGHLIGHT_COLOR[0] - color[0]) * HIGHLIGHT_BLEND,
-        color[1] + (HIGHLIGHT_COLOR[1] - color[1]) * HIGHLIGHT_BLEND,
-        color[2] + (HIGHLIGHT_COLOR[2] - color[2]) * HIGHLIGHT_BLEND,
+        color[0] + (target[0] - color[0]) * amount,
+        color[1] + (target[1] - color[1]) * amount,
+        color[2] + (target[2] - color[2]) * amount,
     )
+
+
+def _tint(color, selected: bool, bookmarked: bool):
+    """Lerp color toward HIGHLIGHT_COLOR when selected."""
+    tinted = color
+    if bookmarked:
+        tinted = _blend(tinted, BOOKMARK_COLOR, BOOKMARK_BLEND)
+    if selected:
+        tinted = _blend(tinted, HIGHLIGHT_COLOR, HIGHLIGHT_BLEND)
+    return tinted
 
 
 class FileObject:
@@ -86,9 +95,9 @@ class FileObject:
         """Turn the object red to indicate an error (e.g. permission denied)."""
         self.color = ERROR_COLOR
 
-    def draw(self, selected=False):
+    def draw(self, selected=False, bookmarked=False):
         w, h, d = self.width / 2, self.height / 2, self.depth / 2
-        r, g, b = _tint(self.color, selected)
+        r, g, b = _tint(self.color, selected, bookmarked)
 
         glBegin(GL_QUADS)
 

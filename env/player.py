@@ -82,9 +82,10 @@ class Player:
             if not self.animation_stack.is_animating():
                 keys = pygame.key.get_pressed()
                 speed = self.config.get("move_speed", 5.0) * dt
+                ctrl_held = pygame.key.get_mods() & (KMOD_CTRL | KMOD_META)
 
                 forward = (keys[K_w] - keys[K_s])
-                right = (keys[K_d] - keys[K_a])
+                right = (int(keys[K_d] and not ctrl_held) - keys[K_a])
                 up = (keys[K_SPACE] - keys[K_LSHIFT])
 
                 if forward or right:

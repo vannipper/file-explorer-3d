@@ -25,6 +25,10 @@ class Renderer:
     _info_panel_text = None
     _info_panel_size = (0, 0)
 
+    _bookmark_panel_texture_id = None
+    _bookmark_panel_text = None
+    _bookmark_panel_size = (0, 0)
+
     _hover_tooltip_texture_id = None
     _hover_tooltip_text = None
     _hover_tooltip_size = (0, 0)
@@ -101,11 +105,11 @@ class Renderer:
         glEnable(GL_LIGHTING)
 
     @staticmethod
-    def DrawObject(obj, selected_object):
+    def DrawObject(obj, selected_object, bookmarked=False):
         glPushMatrix()
         glTranslatef(obj.x, obj.y, obj.z)
         glMaterialfv(GL_FRONT, GL_EMISSION, [0.0, 0.0, 0.0, 1.0])
-        obj.draw(selected=(obj is selected_object))
+        obj.draw(selected=(obj is selected_object), bookmarked=bookmarked)
         glPopMatrix()
 
     @staticmethod
@@ -257,6 +261,115 @@ class Renderer:
             return
 
         Renderer._draw_label_quad(Renderer._label_texture_id, win_w, win_h)
+
+    @staticmethod
+    def DrawBookmarksPanel(world, win_w, win_h):
+        """Render a bookmarks panel and return layout data for interaction."""
+        layout = world.get_bookmark_panel_layout(win_w, win_h)
+        if not layout:
+            return None
+
+        records = layout['page_records']
+        panel_rect = layout['panel_rect']
+
+        panel_surface = pygame.Surface((panel_rect.width, panel_rect.height), pygame.SRCALPHA)
+        panel_surface.fill((10, 14, 24, 210))
+
+        title_font = Renderer._get_font()
+        body_font = Renderer._get_small_font()
+
+        pygame.draw.rect(panel_surface, (255, 255, 255, 32), panel_surface.get_rect(), 1, border_radius=12)
+
+        title = title_font.render("Bookmarks", True, (255, 255, 255))
+        panel_surface.blit(title, (16, 10))
+
+        row_top = layout['header_rect'].height
+        if not records:
+            empty_text = body_font.render("No bookmarks yet", True, (190, 200, 220))
+            panel_surface.blit(empty_text, (16, row_top + 12))
+        for index, record in enumerate(records):
+            row_y = row_top + index * (world.BOOKMARK_ROW_HEIGHT + world.BOOKMARK_ROW_GAP)
+            row_rect = pygame.Rect(10, row_y, panel_rect.width - 20, world.BOOKMARK_ROW_HEIGHT)
+            pygame.draw.rect(panel_surface, (255, 255, 255, 18), row_rect, border_radius=10)
+
+            badge_color = (230, 190, 70) if record['is_dir'] else (90, 180, 230)
+            badge_rect = pygame.Rect(row_rect.x + 10, row_rect.y + 12, world.BOOKMARK_ICON_SIZE + 6, world.BOOKMARK_ICON_SIZE + 6)
+            pygame.draw.rect(panel_surface, badge_color, badge_rect, border_radius=6)
+            badge_label = body_font.render("D" if record['is_dir'] else "F", True, (20, 24, 32))
+            panel_surface.blit(
+                badge_label,
+                (
+                    badge_rect.x + (badge_rect.width - badge_label.get_width()) // 2,
+                    badge_rect.y + (badge_rect.height - badge_label.get_height()) // 2,
+                ),
+            )
+
+            status_text = None
+            status_color = (190, 200, 220)
+            if not record.get('exists', True):
+                status_text = '[MISSING]'
+                status_color = (230, 140, 140)
+            elif record.get('is_protected', False):
+                status_text = '[PROTECTED]'
+                status_color = (240, 190, 110)
+
+            status_width = 0
+            if status_text:
+                status_surf = body_font.render(status_text, True, status_color)
+                status_width = status_surf.get_width() + 12
+                panel_surface.blit(
+                    status_surf,
+                    (row_rect.right - status_surf.get_width() - 10, row_rect.y + 8),
+                )
+
+            name_x = badge_rect.right + 10
+            name_max_width = panel_rect.width - name_x - 14 - status_width
+            name_text = Renderer._fit_text(record['name'], title_font, name_max_width)
+            name_surf = title_font.render(name_text, True, (255, 255, 255))
+            panel_surface.blit(name_surf, (name_x, row_rect.y + 6))
+
+            path_text = Renderer._fit_text(record['path'], body_font, name_max_width)
+            path_surf = body_font.render(path_text, True, (190, 200, 220))
+            panel_surface.blit(path_surf, (name_x, row_rect.y + 28))
+
+        footer_y = panel_rect.height - world.BOOKMARK_FOOTER_HEIGHT + 6
+        if layout['page_count'] > 1:
+            prev_color = (255, 255, 255) if layout['has_prev'] else (90, 96, 110)
+            next_color = (255, 255, 255) if layout['has_next'] else (90, 96, 110)
+
+            prev_rect = layout['prev_rect'].move(-panel_rect.x, -panel_rect.y)
+            next_rect = layout['next_rect'].move(-panel_rect.x, -panel_rect.y)
+            page_text_rect = layout['page_text_rect'].move(-panel_rect.x, -panel_rect.y)
+
+            pygame.draw.rect(panel_surface, (255, 255, 255, 24), prev_rect, border_radius=8)
+            pygame.draw.rect(panel_surface, (255, 255, 255, 24), next_rect, border_radius=8)
+            prev_surf = body_font.render("Prev", True, prev_color)
+            next_surf = body_font.render("Next", True, next_color)
+            panel_surface.blit(prev_surf, (prev_rect.x + (prev_rect.width - prev_surf.get_width()) // 2, prev_rect.y + 6))
+            panel_surface.blit(next_surf, (next_rect.x + (next_rect.width - next_surf.get_width()) // 2, next_rect.y + 6))
+
+            page_text = body_font.render(f"{layout['page_index'] + 1} / {layout['page_count']}", True, (190, 200, 220))
+            panel_surface.blit(page_text, (page_text_rect.x + (page_text_rect.width - page_text.get_width()) // 2, footer_y + 6))
+        elif layout['overflow_count'] > 0:
+            overflow_text = body_font.render(f"+ {layout['overflow_count']} more bookmarks", True, (190, 200, 220))
+            panel_surface.blit(overflow_text, (16, footer_y + 6))
+
+        panel_surface = pygame.transform.flip(panel_surface, False, True)
+        raw = pygame.image.tostring(panel_surface, "RGBA", False)
+        tex_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, panel_rect.width, panel_rect.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw)
+
+        Renderer._bookmark_panel_texture_id = tex_id
+        Renderer._bookmark_panel_text = "|".join(record['path'] for record in records)
+        Renderer._bookmark_panel_size = (panel_rect.width, panel_rect.height)
+
+        draw_y = win_h - panel_rect.y - panel_rect.height
+        Renderer._draw_textured_quad(tex_id, panel_rect.x, draw_y, panel_rect.width, panel_rect.height, win_w, win_h)
+        glDeleteTextures([tex_id])
+        return layout
 
     @staticmethod
     def _upload_label_texture(text: str):
@@ -538,6 +651,27 @@ class Renderer:
             return tex_id
         except Exception:
             return None
+
+    @staticmethod
+    def _fit_text(text: str, font, max_width: int) -> str:
+        if font.size(text)[0] <= max_width:
+            return text
+        ellipsis = "..."
+        if font.size(ellipsis)[0] > max_width:
+            return ""
+
+        left = 0
+        right = len(text)
+        best = ellipsis
+        while left <= right:
+            mid = (left + right) // 2
+            candidate = text[:mid].rstrip() + ellipsis
+            if font.size(candidate)[0] <= max_width:
+                best = candidate
+                left = mid + 1
+            else:
+                right = mid - 1
+        return best
 
     @staticmethod
     def _draw_textured_quad(tex_id, x0, y0, lw, lh, win_w, win_h):
