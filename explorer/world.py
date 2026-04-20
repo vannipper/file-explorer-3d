@@ -284,6 +284,13 @@ class World:
             'timestamp': now,
             'flags': flags,
         }
+
+        # Evict entries whose TTL has expired to prevent unbounded growth.
+        expired = [k for k, v in self._bookmark_access_cache.items()
+                   if (now - v['timestamp']) > self.BOOKMARK_ACCESS_CACHE_TTL]
+        for k in expired:
+            del self._bookmark_access_cache[k]
+
         return flags
 
     def get_bookmark_panel_layout(self, win_w, win_h):
@@ -478,6 +485,9 @@ class World:
 
             elif event.type == KEYDOWN and InteractionHandler.CtrlPressed() and event.key == K_d:
                 self.toggle_bookmark(self.selected_object)
+
+            elif event.type == KEYDOWN and InteractionHandler.CtrlPressed() and event.key == K_b:
+                self.toggle_bookmarks_panel()
 
             elif event.type == KEYDOWN and event.key == K_DELETE and self.bookmarks_panel_visible:
                 record = self._bookmark_record_under_mouse()

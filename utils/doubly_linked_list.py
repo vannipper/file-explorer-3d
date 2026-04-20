@@ -50,7 +50,7 @@ class DoublyLinkedList:
         return self._index.get(full_path)
 
     def contains(self, full_path: str) -> bool:
-        return full_path in self._index
+        return full_path in self
 
     def add_to_front(self, name: str, full_path: str, is_dir: bool) -> DoublyLinkedListNode:
         """Insert a node at the front, moving an existing node if needed."""
