@@ -447,11 +447,15 @@ class Renderer:
         if meta.is_symlink and meta.symlink_target:
             lines.append(f"\u2192 {meta.symlink_target}")
 
-        cache_key = "|".join(lines)
+        panel_max_w = min(420, max(200, win_w // 3))
+
+        cache_key = "|".join(lines) + f"|maxw={panel_max_w}"
         if cache_key != Renderer._info_panel_text:
             Renderer._info_panel_text = cache_key
             size_buf = [0, 0]
-            Renderer._info_panel_texture_id = Renderer._upload_panel_texture(lines, size_buf)
+            Renderer._info_panel_texture_id = Renderer._upload_panel_texture(
+                lines, size_buf, max_w=panel_max_w
+            )
             Renderer._info_panel_size = tuple(size_buf)
 
         if Renderer._info_panel_texture_id is None:
@@ -573,11 +577,13 @@ class Renderer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _upload_panel_texture(lines: list, size_buf: list) -> int | None:
+    def _upload_panel_texture(lines: list, size_buf: list, max_w: int = 0) -> int | None:
         """
         Render multiple text lines onto a single RGBA surface, upload it
         as an OpenGL texture, and write (w, h) into size_buf[0..1].
         First line uses the bold font; remaining lines use the small font.
+        If max_w > 0, the panel is capped at that pixel width and any line
+        that overflows is clipped with an ellipsis.
         Returns the texture ID, or None on failure.
         """
         try:
@@ -588,12 +594,32 @@ class Renderer:
             pad      = 10
             line_gap = 4
 
-            surfaces = []
+            raw_surfs = []
             for i, line in enumerate(lines):
                 font = title_font if i == 0 else body_font
-                surfaces.append(font.render(line, True, (255, 255, 255)))
+                raw_surfs.append((font.render(line, True, (255, 255, 255)), font))
 
-            w = max(s.get_width() for s in surfaces) + pad * 2
+            content_w = max(s.get_width() for s, _ in raw_surfs)
+            if max_w > 0:
+                content_w = min(content_w, max_w - pad * 2)
+
+            surfaces = []
+            for surf, font in raw_surfs:
+                if surf.get_width() > content_w:
+                    ellipsis_w = font.size("...")[0]
+                    text_budget = content_w - ellipsis_w
+                    if text_budget <= 0:
+                        surf = font.render("...", True, (255, 255, 255))
+                    else:
+                        clipped = surf.subsurface((0, 0, text_budget, surf.get_height()))
+                        ell_surf = font.render("...", True, (255, 255, 255))
+                        combined = pygame.Surface((text_budget + ellipsis_w, surf.get_height()), pygame.SRCALPHA)
+                        combined.blit(clipped, (0, 0))
+                        combined.blit(ell_surf, (text_budget, 0))
+                        surf = combined
+                surfaces.append(surf)
+
+            w = content_w + pad * 2
             h = sum(s.get_height() for s in surfaces) + line_gap * (len(surfaces) - 1) + pad * 2
 
             bg = pygame.Surface((w, h), pygame.SRCALPHA)
