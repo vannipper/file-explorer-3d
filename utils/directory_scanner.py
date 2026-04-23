@@ -19,6 +19,8 @@ class DirectoryScanner:
         Returns True on success, False on permission error.
         """
         symlink_graph = getattr(world, "symlink_graph", None)
+        if symlink_graph is not None:
+            symlink_graph.__init__()
         node.expand(symlink_graph)
         children = node.children
 

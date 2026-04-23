@@ -22,17 +22,7 @@ from utils.navigation_stack import NavigationStack
 from utils.renderer import Renderer
 
 
-# ── module-level helper (no GL imports needed) ────────────────────────────
-
 def _pick_preview_cube(folder_obj, children):
-    """
-    Raycast from the crosshair against the mini preview cube grid above
-    folder_obj.  Returns the name of the hit entry, or None.
-
-    Mirrors the layout constants in Renderer.DrawDirectoryPreview exactly so
-    the hit-test matches what is drawn.
-    """
-
     MAX_ITEMS  = 30
     COLS       = 6
     CUBE_SIZE  = 0.18
@@ -50,7 +40,7 @@ def _pick_preview_cube(folder_obj, children):
     shown   = children[:MAX_ITEMS]
     best    = None
     min_d   = float("inf")
-    HIT_R   = CUBE_SIZE * 1.6   # slightly generous hit radius
+    HIT_R   = CUBE_SIZE * 1.6
 
     for i, entry in enumerate(shown):
         col = i % COLS
@@ -68,6 +58,7 @@ def _pick_preview_cube(folder_obj, children):
                 best  = entry.name
 
     return best
+
 
 class World:
     DOUBLE_CLICK_MS = 300
@@ -87,6 +78,7 @@ class World:
     SYMLINK_ROW_HEIGHT = 54
     SYMLINK_ROW_GAP = 8
     SYMLINK_MAX_ROWS = 4
+    SYMLINK_RECORD_CACHE_TTL = 2.0
 
     def __init__(self):
         self.objects = []
@@ -95,12 +87,11 @@ class World:
         self.selector = Selector()
         self.cursor_visible = False
         self.current_directory = None
+        self.root_directory = None  # set once on the first load_directory call
 
-        # set by main after construction
         self.player = None
         self.config = None
 
-        # double-click tracking
         self._last_click_time = 0
         self._last_clicked_object = None
 
@@ -110,30 +101,40 @@ class World:
         self.bookmarks_page_index = 0
         self._bookmark_access_cache = {}
 
-        # navigation history (Unit 7 — Stacks)
         self.nav_stack = NavigationStack()
-
-        # metadata cache (Unit 11 — Dicts)
         self.metadata_cache = MetadataCache()
         self.symlink_graph = SymlinkGraph()
 
-        # hover tooltip tracking
         self._hover_object = None
         self._hover_start  = 0.0
         self.show_hover_tooltip = False
 
-        # directory preview (mini 3-D grid shown above a hovered folder)
         self.hover_preview_children: list | None = None
         self._hover_preview_path: str | None = None
-        # name of the mini-cube currently under the crosshair (or None)
         self.hover_preview_name: str | None = None
+
+        # Cache for symlink records shown in the panel — refreshed by TTL, not per frame.
+        self._symlink_record_cache: list | None = None
+        self._symlink_record_cache_time: float = 0.0
+        self._symlink_record_cache_dir: str | None = None
+
+    # ── root-scope guard ─────────────────────────────────────────────────────
+
+    def _is_within_root(self, path: str) -> bool:
+        """Return True if path is the root directory or any descendant of it."""
+        if self.root_directory is None:
+            return True
+        norm_path = os.path.normpath(os.path.abspath(path))
+        norm_root = os.path.normpath(os.path.abspath(self.root_directory))
+        return norm_path == norm_root or norm_path.startswith(norm_root + os.sep)
+
+    # ── object management ────────────────────────────────────────────────────
 
     def add_object(self, obj):
         self.objects.append(obj)
         self.object_by_path[obj.file_path] = obj
 
     def clear(self):
-        """Remove all objects and reset selection."""
         self.objects = []
         self.object_by_path = {}
         self.selected_object = None
@@ -141,6 +142,12 @@ class World:
         self.selector.stop_drag()
         self._last_click_time = 0
         self._last_clicked_object = None
+        self._symlink_record_cache = None
+
+    def get_object_by_path(self, file_path):
+        return self.object_by_path.get(file_path)
+
+    # ── bookmarks ────────────────────────────────────────────────────────────
 
     def load_bookmarks_from_config(self):
         if not self.config:
@@ -206,14 +213,12 @@ class World:
     def _bookmark_payload(self, target_object=None):
         if target_object is not None:
             return target_object.file_name, target_object.file_path, target_object.is_dir
-
         if self.current_directory:
             return (
                 self._entry_name_from_path(self.current_directory),
                 self.current_directory,
                 True,
             )
-
         return None
 
     def toggle_bookmark(self, target_object=None):
@@ -248,13 +253,15 @@ class World:
             if surface:
                 pygame.mouse.set_pos(surface.get_width() // 2, surface.get_height() // 2)
 
-    def get_object_by_path(self, file_path):
-        return self.object_by_path.get(file_path)
+    # ── navigation ───────────────────────────────────────────────────────────
 
     def _follow_link_target(self, obj):
-        """Follow a link/shortcut edge and navigate to its target."""
         target_path = getattr(obj, "link_target_path", None)
         if not target_path or getattr(obj, "link_broken", False):
+            obj.flash_error()
+            return False
+
+        if not self._is_within_root(target_path):
             obj.flash_error()
             return False
 
@@ -264,7 +271,7 @@ class World:
 
         if os.path.exists(target_path):
             parent = os.path.dirname(target_path)
-            if not parent:
+            if not parent or not self._is_within_root(parent):
                 obj.flash_error()
                 return False
             self.load_directory(parent)
@@ -275,17 +282,80 @@ class World:
         return False
 
     def open_bookmark(self, full_path, is_dir):
+        if not self._is_within_root(full_path):
+            return
+
         if is_dir:
             self.load_directory(full_path)
             return
 
         parent = os.path.dirname(full_path)
-        if parent:
+        if parent and self._is_within_root(parent):
             self.load_directory(parent)
             self.selected_object = self.get_object_by_path(full_path)
 
+    def open_symlink_record(self, record):
+        source_path = record.get("source_path")
+        source_obj = self.get_object_by_path(source_path)
+        if source_obj is not None:
+            return self._follow_link_target(source_obj)
+
+        target_path = record.get("target_path")
+        if not target_path or target_path == "(unresolved)":
+            return False
+
+        if not self._is_within_root(target_path):
+            return False
+
+        if os.path.isdir(target_path):
+            self.load_directory(target_path)
+            return True
+
+        if os.path.exists(target_path):
+            parent = os.path.dirname(target_path)
+            if parent and self._is_within_root(parent):
+                self.load_directory(parent)
+                self.selected_object = self.get_object_by_path(target_path)
+                return True
+
+        return False
+
+    def load_directory(self, path, push_nav=True):
+        node = make_root(path)
+        success = DirectoryScanner.fill_world_from_node(self, node)
+        if not success:
+            if self._last_clicked_object:
+                self._last_clicked_object.flash_error()
+            return
+
+        if self.root_directory is None:
+            self.root_directory = os.path.normpath(os.path.abspath(path))
+
+        if push_nav:
+            self.nav_stack.navigate_to(path)
+
+        self.file_index.build(self.objects)
+
+        if self.config:
+            self.config.set('last_opened_folder', path)
+            self.config.save()
+
+        if self.player:
+            self.player.start_navigation_animation(
+                len(self.objects), DirectoryScanner.COLS, DirectoryScanner.SPACING
+            )
+
+    def deselect_object(self):
+        self.selected_object = None
+
+    def delete_object(self, obj):
+        self.file_index.delete(obj.file_name, obj.file_path)
+        self.objects.remove(obj)
+        self.deselect_object()
+
+    # ── bookmark access cache ────────────────────────────────────────────────
+
     def _get_bookmark_access_flags(self, full_path, is_dir):
-        """Return cached access flags for bookmark status rendering."""
         now = time.time()
         cached = self._bookmark_access_cache.get(full_path)
         if cached and (now - cached['timestamp']) <= self.BOOKMARK_ACCESS_CACHE_TTL:
@@ -307,16 +377,9 @@ class World:
             except OSError:
                 is_protected = True
 
-        flags = {
-            'exists': exists,
-            'is_protected': is_protected,
-        }
-        self._bookmark_access_cache[full_path] = {
-            'timestamp': now,
-            'flags': flags,
-        }
+        flags = {'exists': exists, 'is_protected': is_protected}
+        self._bookmark_access_cache[full_path] = {'timestamp': now, 'flags': flags}
 
-        # Evict entries whose TTL has expired to prevent unbounded growth.
         expired = [k for k, v in self._bookmark_access_cache.items()
                    if (now - v['timestamp']) > self.BOOKMARK_ACCESS_CACHE_TTL]
         for k in expired:
@@ -324,16 +387,30 @@ class World:
 
         return flags
 
+    # ── symlink record cache ─────────────────────────────────────────────────
+
     def _get_visible_symlink_records(self):
-        """Return read-only records for symlinks/shortcuts visible in current view."""
+        """Return symlink records for the current view, refreshed by TTL rather than per frame."""
+        now = time.time()
+        cache_stale = (
+            self._symlink_record_cache is None
+            or self._symlink_record_cache_dir != self.current_directory
+            or (now - self._symlink_record_cache_time) > self.SYMLINK_RECORD_CACHE_TTL
+        )
+        if not cache_stale:
+            return self._symlink_record_cache
+
         records = []
         for obj in self.objects:
             if not getattr(obj, "is_link", False):
                 continue
 
             target_path = getattr(obj, "link_target_path", None)
-            exists = bool(target_path and os.path.exists(target_path))
-            is_dir = bool(target_path and os.path.isdir(target_path))
+            within_root = self._is_within_root(target_path) if target_path else False
+            truly_broken = bool(getattr(obj, "link_broken", False))
+            inaccessible = not within_root or (not target_path)
+            exists = bool(target_path and within_root and not truly_broken and os.path.exists(target_path))
+            is_dir = bool(target_path and exists and os.path.isdir(target_path))
             is_protected = False
             if exists:
                 try:
@@ -355,34 +432,18 @@ class World:
                 "is_dir": is_dir,
                 "exists": exists,
                 "is_protected": is_protected,
-                "link_broken": bool(getattr(obj, "link_broken", False)) or not exists,
+                "link_broken": truly_broken,
+                "inaccessible": inaccessible,
             })
 
         records.sort(key=lambda item: item["name"].lower())
+
+        self._symlink_record_cache = records
+        self._symlink_record_cache_time = now
+        self._symlink_record_cache_dir = self.current_directory
         return records
 
-    def open_symlink_record(self, record):
-        """Follow a symlink/shortcut record selected from the panel."""
-        source_path = record.get("source_path")
-        source_obj = self.get_object_by_path(source_path)
-        if source_obj is not None:
-            return self._follow_link_target(source_obj)
-
-        target_path = record.get("target_path")
-        if not target_path or target_path == "(unresolved)":
-            return False
-
-        if os.path.isdir(target_path):
-            self.load_directory(target_path)
-            return True
-
-        if os.path.exists(target_path):
-            parent = os.path.dirname(target_path)
-            if parent:
-                self.load_directory(parent)
-                self.selected_object = self.get_object_by_path(target_path)
-                return True
-        return False
+    # ── panel layout ─────────────────────────────────────────────────────────
 
     def get_bookmark_panel_layout(self, win_w, win_h):
         if not self.bookmarks_panel_visible:
@@ -495,54 +556,16 @@ class World:
             return None
         return self._bookmark_record_at_pos(pygame.mouse.get_pos(), *surface.get_size())
 
-    def load_directory(self, path, push_nav=True):
-        """Scan path, populate scene, reset camera, persist to config.
-
-        push_nav=False is used internally by go_back/go_forward so that
-        the navigation stack is not updated a second time (the stack
-        already moved current_path before calling this method).
-        """
-        node = make_root(path)
-        success = DirectoryScanner.fill_world_from_node(self, node)
-        if not success:
-            if self._last_clicked_object:
-                self._last_clicked_object.flash_error()
-            return
-
-        if push_nav:
-            self.nav_stack.navigate_to(path)
-
-        self.file_index.build(self.objects)
-
-        if self.config:
-            self.config.set('last_opened_folder', path)
-            self.config.save()
-
-        if self.player:
-            self.player.start_navigation_animation(
-                len(self.objects), DirectoryScanner.COLS, DirectoryScanner.SPACING
-            )
-
-    def deselect_object(self):
-        self.selected_object = None
-
-    def delete_object(self, obj):
-        self.file_index.delete(obj.file_name, obj.file_path)
-        self.objects.remove(obj)
-        self.deselect_object()
+    # ── per-frame update ─────────────────────────────────────────────────────
 
     def update(self):
-        """Per-frame hover-selection: highlight whichever object the crosshair aims at."""
         if not self.cursor_visible:
             newly_selected = self.selector.handle_selection(self.objects)
 
-            # Track how long the crosshair has rested on the same object.
-            # After 500 ms of stable hover, flag the tooltip for display.
             if newly_selected is not self._hover_object:
                 self._hover_object      = newly_selected
                 self._hover_start       = time.time()
                 self.show_hover_tooltip = False
-                # Reset preview when crosshair leaves a folder
                 self.hover_preview_children = None
                 self._hover_preview_path    = None
                 self.hover_preview_name     = None
@@ -550,8 +573,6 @@ class World:
                 if time.time() - self._hover_start >= 0.5:
                     self.show_hover_tooltip = True
 
-            # Lazily scan a hovered directory's children once the crosshair
-            # has rested on it for 500 ms (same gate as show_hover_tooltip).
             if (self.show_hover_tooltip
                     and newly_selected is not None
                     and newly_selected.is_dir
@@ -569,8 +590,6 @@ class World:
                     self.hover_preview_children = []
                 self._hover_preview_path = newly_selected.file_path
 
-            # Raycast against mini preview cubes to find which one the
-            # crosshair is aimed at, and expose its name for the tooltip.
             if (newly_selected is not None
                     and newly_selected.is_dir
                     and self.hover_preview_children):
@@ -585,6 +604,8 @@ class World:
         else:
             self.show_hover_tooltip = False
             self.hover_preview_name = None
+
+    # ── event handling ───────────────────────────────────────────────────────
 
     def _print_tree(self, node, prefix=""):
         children = node.get_children()

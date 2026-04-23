@@ -407,8 +407,11 @@ class Renderer:
 
                 status_text = None
                 status_color = (190, 200, 220)
-                if record.get('link_broken', False):
-                    status_text = '[BROKEN]'
+                if record.get('inaccessible', False):
+                    status_text = '[INACCESSIBLE]'
+                    status_color = (230, 140, 140)
+                elif record.get('link_broken', False):
+                    status_text = '[INACCESSIBLE]'
                     status_color = (230, 140, 140)
                 elif record.get('is_protected', False):
                     status_text = '[PROTECTED]'
@@ -544,7 +547,7 @@ class Renderer:
             if getattr(obj, "link_target_path", None):
                 lines.append(f"Target: {obj.link_target_path}")
             if getattr(obj, "link_broken", False):
-                lines.append("[BROKEN LINK]")
+                lines.append("[INACCESSIBLE]")
             if getattr(obj, "in_cycle", False):
                 lines.append("[CYCLE WARNING]")
             if getattr(obj, "link_target_path", None) and not getattr(obj, "link_target_in_view", True):

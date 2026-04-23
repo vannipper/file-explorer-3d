@@ -110,8 +110,8 @@ class SymlinkGraph:
         def canonical_cycle(cycle: List[str]) -> Tuple[str, ...]:
             if not cycle:
                 return tuple()
-            rotations = [tuple(cycle[i:] + cycle[:i]) for i in range(len(cycle))]
-            return min(rotations)
+            start = cycle.index(min(cycle))
+            return tuple(cycle[start:] + cycle[:start])
 
         def dfs(node: str) -> None:
             color[node] = GRAY
