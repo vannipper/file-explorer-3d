@@ -12,6 +12,7 @@ from OpenGL.GL import *
 from explorer.selector import Selector
 from explorer.file_tree_node import make_root
 from explorer.file_index import FileIndex
+from explorer.symlink_graph import SymlinkGraph
 import numpy as np
 from utils.directory_scanner import DirectoryScanner
 from utils.interaction_handler import InteractionHandler
@@ -74,16 +75,22 @@ class World:
     BOOKMARK_PANEL_MARGIN = 12
     BOOKMARK_PANEL_TOP = 12
     BOOKMARK_PANEL_BOTTOM = 12
-    BOOKMARK_PANEL_MAX_HEIGHT = 360
+    BOOKMARK_PANEL_MAX_HEIGHT = 560
     BOOKMARK_ROW_HEIGHT = 54
     BOOKMARK_ROW_GAP = 8
     BOOKMARK_ICON_SIZE = 22
     BOOKMARK_HEADER_HEIGHT = 42
     BOOKMARK_FOOTER_HEIGHT = 38
     BOOKMARK_ACCESS_CACHE_TTL = 2.0
+    SYMLINK_SECTION_GAP = 10
+    SYMLINK_HEADER_HEIGHT = 34
+    SYMLINK_ROW_HEIGHT = 54
+    SYMLINK_ROW_GAP = 8
+    SYMLINK_MAX_ROWS = 4
 
     def __init__(self):
         self.objects = []
+        self.object_by_path = {}
         self.selected_object = None
         self.selector = Selector()
         self.cursor_visible = False
@@ -108,6 +115,7 @@ class World:
 
         # metadata cache (Unit 11 — Dicts)
         self.metadata_cache = MetadataCache()
+        self.symlink_graph = SymlinkGraph()
 
         # hover tooltip tracking
         self._hover_object = None
@@ -122,10 +130,12 @@ class World:
 
     def add_object(self, obj):
         self.objects.append(obj)
+        self.object_by_path[obj.file_path] = obj
 
     def clear(self):
         """Remove all objects and reset selection."""
         self.objects = []
+        self.object_by_path = {}
         self.selected_object = None
         self.file_index.clear()
         self.selector.stop_drag()
@@ -239,10 +249,30 @@ class World:
                 pygame.mouse.set_pos(surface.get_width() // 2, surface.get_height() // 2)
 
     def get_object_by_path(self, file_path):
-        for obj in self.objects:
-            if obj.file_path == file_path:
-                return obj
-        return None
+        return self.object_by_path.get(file_path)
+
+    def _follow_link_target(self, obj):
+        """Follow a link/shortcut edge and navigate to its target."""
+        target_path = getattr(obj, "link_target_path", None)
+        if not target_path or getattr(obj, "link_broken", False):
+            obj.flash_error()
+            return False
+
+        if os.path.isdir(target_path):
+            self.load_directory(target_path)
+            return True
+
+        if os.path.exists(target_path):
+            parent = os.path.dirname(target_path)
+            if not parent:
+                obj.flash_error()
+                return False
+            self.load_directory(parent)
+            self.selected_object = self.get_object_by_path(target_path)
+            return True
+
+        obj.flash_error()
+        return False
 
     def open_bookmark(self, full_path, is_dir):
         if is_dir:
@@ -294,6 +324,66 @@ class World:
 
         return flags
 
+    def _get_visible_symlink_records(self):
+        """Return read-only records for symlinks/shortcuts visible in current view."""
+        records = []
+        for obj in self.objects:
+            if not getattr(obj, "is_link", False):
+                continue
+
+            target_path = getattr(obj, "link_target_path", None)
+            exists = bool(target_path and os.path.exists(target_path))
+            is_dir = bool(target_path and os.path.isdir(target_path))
+            is_protected = False
+            if exists:
+                try:
+                    if is_dir:
+                        with os.scandir(target_path) as entries:
+                            next(entries, None)
+                    else:
+                        with open(target_path, "rb"):
+                            pass
+                except (PermissionError, OSError):
+                    is_protected = True
+
+            records.append({
+                "kind": "symlink",
+                "name": obj.file_name,
+                "path": obj.file_path,
+                "source_path": obj.file_path,
+                "target_path": target_path or "(unresolved)",
+                "is_dir": is_dir,
+                "exists": exists,
+                "is_protected": is_protected,
+                "link_broken": bool(getattr(obj, "link_broken", False)) or not exists,
+            })
+
+        records.sort(key=lambda item: item["name"].lower())
+        return records
+
+    def open_symlink_record(self, record):
+        """Follow a symlink/shortcut record selected from the panel."""
+        source_path = record.get("source_path")
+        source_obj = self.get_object_by_path(source_path)
+        if source_obj is not None:
+            return self._follow_link_target(source_obj)
+
+        target_path = record.get("target_path")
+        if not target_path or target_path == "(unresolved)":
+            return False
+
+        if os.path.isdir(target_path):
+            self.load_directory(target_path)
+            return True
+
+        if os.path.exists(target_path):
+            parent = os.path.dirname(target_path)
+            if parent:
+                self.load_directory(parent)
+                self.selected_object = self.get_object_by_path(target_path)
+                return True
+        return False
+
     def get_bookmark_panel_layout(self, win_w, win_h):
         if not self.bookmarks_panel_visible:
             return None
@@ -302,7 +392,10 @@ class World:
         display_records = []
         for record in page_records:
             flags = self._get_bookmark_access_flags(record['path'], record['is_dir'])
-            display_records.append({**record, **flags})
+            display_records.append({**record, **flags, 'kind': 'bookmark'})
+
+        symlink_records_all = self._get_visible_symlink_records()
+        symlink_records = symlink_records_all[:self.SYMLINK_MAX_ROWS]
 
         panel_width = min(self.BOOKMARK_PANEL_WIDTH, max(300, win_w - 2 * self.BOOKMARK_PANEL_MARGIN))
         max_height = min(
@@ -311,10 +404,24 @@ class World:
         )
         row_count = max(1, len(display_records))
         rows_height = row_count * self.BOOKMARK_ROW_HEIGHT + max(0, row_count - 1) * self.BOOKMARK_ROW_GAP
-        panel_height = min(
-            max_height,
-            self.BOOKMARK_HEADER_HEIGHT + rows_height + self.BOOKMARK_FOOTER_HEIGHT + 16,
+
+        symlink_row_count = len(symlink_records)
+        symlink_rows_height = (
+            symlink_row_count * self.SYMLINK_ROW_HEIGHT
+            + max(0, symlink_row_count - 1) * self.SYMLINK_ROW_GAP
         )
+        symlink_body_height = symlink_rows_height if symlink_row_count > 0 else 24
+
+        panel_content_height = (
+            self.BOOKMARK_HEADER_HEIGHT
+            + rows_height
+            + self.BOOKMARK_FOOTER_HEIGHT
+            + self.SYMLINK_SECTION_GAP
+            + self.SYMLINK_HEADER_HEIGHT
+            + symlink_body_height
+            + 20
+        )
+        panel_height = min(max_height, panel_content_height)
         x = win_w - panel_width - self.BOOKMARK_PANEL_MARGIN
         y = self.BOOKMARK_PANEL_TOP
 
@@ -325,10 +432,22 @@ class World:
             row_rect = pygame.Rect(x + 10, row_top, panel_width - 20, self.BOOKMARK_ROW_HEIGHT)
             rows.append({'record': record, 'rect': row_rect, 'index': index})
 
-        footer_y = y + panel_height - self.BOOKMARK_FOOTER_HEIGHT + 4
+        footer_y = y + self.BOOKMARK_HEADER_HEIGHT + rows_height + 4
         prev_rect = pygame.Rect(x + 12, footer_y, 72, 26)
         next_rect = pygame.Rect(x + panel_width - 84, footer_y, 72, 26)
         page_text_rect = pygame.Rect(x + 92, footer_y, panel_width - 184, 26)
+
+        symlink_header_top = footer_y + self.BOOKMARK_FOOTER_HEIGHT + self.SYMLINK_SECTION_GAP
+        symlink_header_rect = pygame.Rect(x, symlink_header_top, panel_width, self.SYMLINK_HEADER_HEIGHT)
+
+        symlink_rows = []
+        symlink_row_start_y = symlink_header_rect.bottom
+        for index, record in enumerate(symlink_records):
+            row_top = symlink_row_start_y + index * (self.SYMLINK_ROW_HEIGHT + self.SYMLINK_ROW_GAP)
+            row_rect = pygame.Rect(x + 10, row_top, panel_width - 20, self.SYMLINK_ROW_HEIGHT)
+            symlink_rows.append({'record': record, 'rect': row_rect, 'index': index})
+
+        symlink_empty_rect = pygame.Rect(x + 16, symlink_row_start_y + 8, panel_width - 32, 24)
 
         return {
             'panel_rect': pygame.Rect(x, y, panel_width, panel_height),
@@ -344,6 +463,11 @@ class World:
             'next_rect': next_rect,
             'page_text_rect': page_text_rect,
             'overflow_count': max(0, len(self.bookmarks) - len(display_records)),
+            'symlink_header_rect': symlink_header_rect,
+            'symlink_rows': symlink_rows,
+            'symlink_records': symlink_records,
+            'symlink_empty_rect': symlink_empty_rect,
+            'symlink_overflow_count': max(0, len(symlink_records_all) - len(symlink_records)),
         }
 
     def _bookmark_record_at_pos(self, pos, win_w, win_h):
@@ -357,6 +481,10 @@ class World:
             return {'action': 'next'}
 
         for row in layout['rows']:
+            if row['rect'].collidepoint(pos):
+                return row['record']
+
+        for row in layout.get('symlink_rows', []):
             if row['rect'].collidepoint(pos):
                 return row['record']
         return None
@@ -494,6 +622,7 @@ class World:
                 record = self._bookmark_record_under_mouse()
                 if record is None and self.selected_object and self.is_bookmarked(self.selected_object.file_path):
                     record = {
+                        'kind': 'bookmark',
                         'name': self.selected_object.file_name,
                         'path': self.selected_object.file_path,
                         'is_dir': self.selected_object.is_dir,
@@ -503,7 +632,7 @@ class World:
                         self.previous_bookmark_page()
                     elif record.get('action') == 'next':
                         self.next_bookmark_page(win_size[1])
-                    else:
+                    elif record.get('kind') == 'bookmark':
                         self.remove_bookmark(record['path'])
 
             elif event.type == KEYDOWN and not self.cursor_visible:
@@ -543,6 +672,11 @@ class World:
                         self.next_bookmark_page(win_size[1])
                         continue
 
+                    if record.get('kind') == 'symlink':
+                        if event.button == 1:
+                            self.open_symlink_record(record)
+                        continue
+
                     if event.button == 3:
                         self.remove_bookmark(record['path'])
                     else:
@@ -561,7 +695,9 @@ class World:
                             and now - self._last_click_time < self.DOUBLE_CLICK_MS):
                         target = Selector.pick_object(self.objects)
                         if target is self._last_clicked_object:
-                            if hasattr(target, 'is_dir') and target.is_dir:
+                            if getattr(target, "is_link", False):
+                                self._follow_link_target(target)
+                            elif hasattr(target, 'is_dir') and target.is_dir:
                                 self.load_directory(target.file_path)
                             self._last_clicked_object = None
                             self._last_click_time = 0

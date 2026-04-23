@@ -40,6 +40,11 @@ HIGHLIGHT_COLOR = (1.0, 0.85, 0.2)  # warm yellow tint when selected
 HIGHLIGHT_BLEND = 0.5               # 0 = original, 1 = full highlight
 BOOKMARK_COLOR = (1.0, 0.82, 0.25)
 BOOKMARK_BLEND = 0.22
+LINK_TINT_COLOR = (0.2, 0.95, 0.95)
+LINK_TINT_BLEND = 0.35
+CYCLE_COLOR = (1.0, 0.5, 0.1)
+CYCLE_BLEND = 0.45
+BROKEN_BLEND = 0.85
 
 
 def _blend(color, target, amount):
@@ -50,9 +55,15 @@ def _blend(color, target, amount):
     )
 
 
-def _tint(color, selected: bool, bookmarked: bool):
+def _tint(color, selected: bool, bookmarked: bool, is_link: bool = False, in_cycle: bool = False, broken: bool = False):
     """Lerp color toward HIGHLIGHT_COLOR when selected."""
     tinted = color
+    if is_link:
+        tinted = _blend(tinted, LINK_TINT_COLOR, LINK_TINT_BLEND)
+    if in_cycle:
+        tinted = _blend(tinted, CYCLE_COLOR, CYCLE_BLEND)
+    if broken:
+        tinted = _blend(tinted, ERROR_COLOR, BROKEN_BLEND)
     if bookmarked:
         tinted = _blend(tinted, BOOKMARK_COLOR, BOOKMARK_BLEND)
     if selected:
@@ -66,11 +77,18 @@ class FileObject:
     FOLDER_SIZE = (1.0, 1.0, 1.0)
     FILE_SIZE   = (0.5, 0.5, 0.5)
 
-    def __init__(self, file_path, is_dir):
+    def __init__(self, file_path, is_dir, is_symlink=False, is_shortcut=False, link_target_path=None, link_broken=False):
         self.file_path = file_path
         self.file_name = os.path.basename(file_path)
         self.is_dir    = is_dir
         self.file_ext  = "" if is_dir else os.path.splitext(self.file_name)[1].lower()
+        self.is_symlink = is_symlink
+        self.is_shortcut = is_shortcut
+        self.is_link = is_symlink or is_shortcut
+        self.link_target_path = link_target_path
+        self.link_broken = link_broken
+        self.in_cycle = False
+        self.link_target_in_view = False
 
         self.width, self.height, self.depth = (
             self.FOLDER_SIZE if is_dir else self.FILE_SIZE
@@ -97,7 +115,14 @@ class FileObject:
 
     def draw(self, selected=False, bookmarked=False):
         w, h, d = self.width / 2, self.height / 2, self.depth / 2
-        r, g, b = _tint(self.color, selected, bookmarked)
+        r, g, b = _tint(
+            self.color,
+            selected,
+            bookmarked,
+            is_link=self.is_link,
+            in_cycle=self.in_cycle,
+            broken=self.link_broken,
+        )
 
         glBegin(GL_QUADS)
 

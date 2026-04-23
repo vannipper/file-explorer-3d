@@ -18,7 +18,9 @@ class DirectoryScanner:
         """Clear the world and populate it from a FileTreeNode.
         Returns True on success, False on permission error.
         """
-        children = node.get_children()
+        symlink_graph = getattr(world, "symlink_graph", None)
+        node.expand(symlink_graph)
+        children = node.children
 
         if node.access_denied:
             print("access denied") # TODO: make this a visual cube within the program
@@ -35,7 +37,14 @@ class DirectoryScanner:
         spacing = DirectoryScanner.SPACING
 
         for idx, child in enumerate(children):
-            obj = FileObject(file_path=child.path, is_dir=child.is_dir)
+            obj = FileObject(
+                file_path=child.path,
+                is_dir=child.is_dir,
+                is_symlink=child.is_symlink,
+                is_shortcut=child.is_shortcut,
+                link_target_path=child.link_target_path,
+                link_broken=child.link_is_broken,
+            )
 
             x = (idx % cols) * spacing
             z = (idx // cols) * spacing
@@ -43,6 +52,13 @@ class DirectoryScanner:
 
             obj.set_position(x, y, z)
             world.add_object(obj)
+
+        cycle_nodes = set()
+        if symlink_graph is not None:
+            cycle_nodes = symlink_graph.get_cycle_nodes()
+        for obj in world.objects:
+            obj.in_cycle = obj.file_path in cycle_nodes
+            obj.link_target_in_view = bool(obj.link_target_path and world.get_object_by_path(obj.link_target_path))
 
         if hasattr(world, 'metadata_cache') and isinstance(world.metadata_cache, MetadataCache):
             world.metadata_cache.preload([obj.file_path for obj in world.objects])
