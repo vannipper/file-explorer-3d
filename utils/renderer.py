@@ -255,23 +255,6 @@ class Renderer:
         glMatrixMode(GL_MODELVIEW);  glPopMatrix()
 
     @staticmethod
-    def DrawSelectedLabel(selected_object, win_w, win_h):
-        """Render the selected object's file name as a 2D HUD label."""
-        if selected_object is None:
-            return
-
-        label_text = selected_object.file_name
-
-        if label_text != Renderer._label_text:
-            Renderer._label_text = label_text
-            Renderer._label_texture_id = Renderer._upload_label_texture(label_text)
-
-        if Renderer._label_texture_id is None:
-            return
-
-        Renderer._draw_label_quad(Renderer._label_texture_id, win_w, win_h)
-
-    @staticmethod
     def DrawBookmarksPanel(world, win_w, win_h):
         """Render a bookmarks panel and return layout data for interaction."""
         layout = world.get_bookmark_panel_layout(win_w, win_h)
