@@ -30,7 +30,7 @@ class Renderer:
     _info_panel_size = (0, 0)
 
     _bookmark_panel_texture_id = None
-    _bookmark_panel_text = None
+    _bookmark_panel_cache_key = None
     _bookmark_panel_size = (0, 0)
 
     _hover_tooltip_texture_id = None
@@ -74,8 +74,9 @@ class Renderer:
         for event in events:
             if event.type == VIDEORESIZE:
                 InteractionHandler.ResizeWindow(*event.size)
-                surf = pygame.display.get_surface()
-                return surf.get_width(), surf.get_height()
+                glViewport(0, 0, event.size[0], event.size[1])
+                viewport = glGetIntegerv(GL_VIEWPORT)
+                return int(viewport[2]), int(viewport[3])
         return None
 
     @staticmethod
@@ -406,11 +407,8 @@ class Renderer:
 
                 status_text = None
                 status_color = (190, 200, 220)
-                if record.get('inaccessible', False):
-                    status_text = '[INACCESSIBLE]'
-                    status_color = (230, 140, 140)
-                elif record.get('link_broken', False):
-                    status_text = '[INACCESSIBLE]'
+                if record.get('link_broken', False):
+                    status_text = '[BROKEN]'
                     status_color = (230, 140, 140)
                 elif record.get('is_protected', False):
                     status_text = '[PROTECTED]'
@@ -448,21 +446,31 @@ class Renderer:
                 overflow_y = symlink_header_rel.bottom + len(symlink_rows) * (world.SYMLINK_ROW_HEIGHT + world.SYMLINK_ROW_GAP) + 4
                 panel_surface.blit(overflow_surf, (16, overflow_y))
 
-        panel_surface = pygame.transform.flip(panel_surface, False, True)
-        raw = pygame.image.tostring(panel_surface, "RGBA", False)
-        tex_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, tex_id)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, panel_rect.width, panel_rect.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw)
+        cache_key = (
+            "|".join(r['path'] for r in records),
+            "|".join(r['path'] for r in symlink_records),
+            panel_rect.width, panel_rect.height,
+            layout['page_index'], layout['page_count'],
+        )
 
-        Renderer._bookmark_panel_texture_id = tex_id
-        Renderer._bookmark_panel_text = "|".join(record['path'] for record in records)
-        Renderer._bookmark_panel_size = (panel_rect.width, panel_rect.height)
+        if cache_key != Renderer._bookmark_panel_cache_key or Renderer._bookmark_panel_texture_id is None:
+            if Renderer._bookmark_panel_texture_id is not None:
+                glDeleteTextures([Renderer._bookmark_panel_texture_id])
+
+            panel_surface = pygame.transform.flip(panel_surface, False, True)
+            raw = pygame.image.tostring(panel_surface, "RGBA", False)
+            tex_id = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, tex_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, panel_rect.width, panel_rect.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw)
+
+            Renderer._bookmark_panel_texture_id = tex_id
+            Renderer._bookmark_panel_cache_key = cache_key
+            Renderer._bookmark_panel_size = (panel_rect.width, panel_rect.height)
 
         draw_y = win_h - panel_rect.y - panel_rect.height
-        Renderer._draw_textured_quad(tex_id, panel_rect.x, draw_y, panel_rect.width, panel_rect.height, win_w, win_h)
-        glDeleteTextures([tex_id])
+        Renderer._draw_textured_quad(Renderer._bookmark_panel_texture_id, panel_rect.x, draw_y, panel_rect.width, panel_rect.height, win_w, win_h)
         return layout
 
     @staticmethod
@@ -546,7 +554,7 @@ class Renderer:
             if getattr(obj, "link_target_path", None):
                 lines.append(f"Target: {obj.link_target_path}")
             if getattr(obj, "link_broken", False):
-                lines.append("[INACCESSIBLE]")
+                lines.append("[BROKEN LINK]")
             if getattr(obj, "in_cycle", False):
                 lines.append("[CYCLE WARNING]")
             if getattr(obj, "link_target_path", None) and not getattr(obj, "link_target_in_view", True):

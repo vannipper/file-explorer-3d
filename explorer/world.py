@@ -5,6 +5,7 @@ Contains the World class, which manages drawable objects in the 3D environment.
 
 import os
 import time
+import threading
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
@@ -87,7 +88,6 @@ class World:
         self.selector = Selector()
         self.cursor_visible = False
         self.current_directory = None
-        self.root_directory = None  # set once on the first load_directory call
 
         self.player = None
         self.config = None
@@ -117,16 +117,8 @@ class World:
         self._symlink_record_cache: list | None = None
         self._symlink_record_cache_time: float = 0.0
         self._symlink_record_cache_dir: str | None = None
-
-    # ── root-scope guard ─────────────────────────────────────────────────────
-
-    def _is_within_root(self, path: str) -> bool:
-        """Return True if path is the root directory or any descendant of it."""
-        if self.root_directory is None:
-            return True
-        norm_path = os.path.normpath(os.path.abspath(path))
-        norm_root = os.path.normpath(os.path.abspath(self.root_directory))
-        return norm_path == norm_root or norm_path.startswith(norm_root + os.sep)
+        self._symlink_refresh_thread: threading.Thread | None = None
+        self._symlink_refresh_lock = threading.Lock()
 
     # ── object management ────────────────────────────────────────────────────
 
@@ -143,6 +135,7 @@ class World:
         self._last_click_time = 0
         self._last_clicked_object = None
         self._symlink_record_cache = None
+        self._symlink_refresh_thread = None
 
     def get_object_by_path(self, file_path):
         return self.object_by_path.get(file_path)
@@ -261,17 +254,13 @@ class World:
             obj.flash_error()
             return False
 
-        if not self._is_within_root(target_path):
-            obj.flash_error()
-            return False
-
         if os.path.isdir(target_path):
             self.load_directory(target_path)
             return True
 
         if os.path.exists(target_path):
             parent = os.path.dirname(target_path)
-            if not parent or not self._is_within_root(parent):
+            if not parent:
                 obj.flash_error()
                 return False
             self.load_directory(parent)
@@ -282,15 +271,12 @@ class World:
         return False
 
     def open_bookmark(self, full_path, is_dir):
-        if not self._is_within_root(full_path):
-            return
-
         if is_dir:
             self.load_directory(full_path)
             return
 
         parent = os.path.dirname(full_path)
-        if parent and self._is_within_root(parent):
+        if parent:
             self.load_directory(parent)
             self.selected_object = self.get_object_by_path(full_path)
 
@@ -304,23 +290,20 @@ class World:
         if not target_path or target_path == "(unresolved)":
             return False
 
-        if not self._is_within_root(target_path):
-            return False
-
         if os.path.isdir(target_path):
             self.load_directory(target_path)
             return True
 
         if os.path.exists(target_path):
             parent = os.path.dirname(target_path)
-            if parent and self._is_within_root(parent):
+            if parent:
                 self.load_directory(parent)
                 self.selected_object = self.get_object_by_path(target_path)
                 return True
 
         return False
 
-    def load_directory(self, path, push_nav=True):
+    def load_directory(self, path, push_nav=True, new_root=False):
         node = make_root(path)
         success = DirectoryScanner.fill_world_from_node(self, node)
         if not success:
@@ -328,8 +311,8 @@ class World:
                 self._last_clicked_object.flash_error()
             return
 
-        if self.root_directory is None:
-            self.root_directory = os.path.normpath(os.path.abspath(path))
+        if new_root:
+            self.nav_stack = NavigationStack()
 
         if push_nav:
             self.nav_stack.navigate_to(path)
@@ -390,26 +373,43 @@ class World:
     # ── symlink record cache ─────────────────────────────────────────────────
 
     def _get_visible_symlink_records(self):
-        """Return symlink records for the current view, refreshed by TTL rather than per frame."""
+        """Return cached symlink records, triggering a background refresh when stale."""
         now = time.time()
         cache_stale = (
             self._symlink_record_cache is None
             or self._symlink_record_cache_dir != self.current_directory
             or (now - self._symlink_record_cache_time) > self.SYMLINK_RECORD_CACHE_TTL
         )
-        if not cache_stale:
-            return self._symlink_record_cache
 
+        if cache_stale:
+            # Serve stale cache immediately; kick off a refresh in the background
+            # only if one isn't already running.
+            refresh_needed = (
+                self._symlink_refresh_thread is None
+                or not self._symlink_refresh_thread.is_alive()
+            )
+            if refresh_needed:
+                snapshot = [
+                    (obj.file_name, obj.file_path, obj.link_target_path, obj.link_broken)
+                    for obj in self.objects
+                    if getattr(obj, "is_link", False)
+                ]
+                thread = threading.Thread(
+                    target=self._refresh_symlink_cache,
+                    args=(snapshot, self.current_directory),
+                    daemon=True,
+                )
+                self._symlink_refresh_thread = thread
+                thread.start()
+
+        with self._symlink_refresh_lock:
+            return list(self._symlink_record_cache) if self._symlink_record_cache is not None else []
+
+    def _refresh_symlink_cache(self, snapshot, directory):
+        """Run on a background thread: stat each symlink target and update the cache."""
         records = []
-        for obj in self.objects:
-            if not getattr(obj, "is_link", False):
-                continue
-
-            target_path = getattr(obj, "link_target_path", None)
-            within_root = self._is_within_root(target_path) if target_path else False
-            truly_broken = bool(getattr(obj, "link_broken", False))
-            inaccessible = not within_root or (not target_path)
-            exists = bool(target_path and within_root and not truly_broken and os.path.exists(target_path))
+        for name, path, target_path, link_broken in snapshot:
+            exists = bool(target_path and not link_broken and os.path.exists(target_path))
             is_dir = bool(target_path and exists and os.path.isdir(target_path))
             is_protected = False
             if exists:
@@ -425,23 +425,22 @@ class World:
 
             records.append({
                 "kind": "symlink",
-                "name": obj.file_name,
-                "path": obj.file_path,
-                "source_path": obj.file_path,
+                "name": name,
+                "path": path,
+                "source_path": path,
                 "target_path": target_path or "(unresolved)",
                 "is_dir": is_dir,
                 "exists": exists,
                 "is_protected": is_protected,
-                "link_broken": truly_broken,
-                "inaccessible": inaccessible,
+                "link_broken": link_broken,
             })
 
         records.sort(key=lambda item: item["name"].lower())
 
-        self._symlink_record_cache = records
-        self._symlink_record_cache_time = now
-        self._symlink_record_cache_dir = self.current_directory
-        return records
+        with self._symlink_refresh_lock:
+            self._symlink_record_cache = records
+            self._symlink_record_cache_time = time.time()
+            self._symlink_record_cache_dir = directory
 
     # ── panel layout ─────────────────────────────────────────────────────────
 
