@@ -25,7 +25,13 @@ class InteractionHandler:
     
     @staticmethod
     def ResizeWindow(newWidth, newHeight):
+        newWidth  = max(newWidth,  200)
+        newHeight = max(newHeight, 150)
         pygame.display.set_mode((newWidth, newHeight), DOUBLEBUF | OPENGL | RESIZABLE)
+        if not pygame.mouse.get_visible():
+            pygame.event.set_grab(True)
+            cx, cy = newWidth // 2, newHeight // 2
+            pygame.mouse.set_pos(cx, cy)
 
     @staticmethod
     def GetRay(mouse_x, mouse_y):
@@ -42,4 +48,3 @@ class InteractionHandler:
             return ray_o, (ray_d / norm if norm > 0 else ray_d)
         except:
             return np.array([0,0,0]), np.array([0,0,-1])
-        
