@@ -18,6 +18,7 @@ from utils.interaction_handler import InteractionHandler
 from utils.doubly_linked_list import DoublyLinkedList
 from utils.metadata_cache import MetadataCache
 from utils.navigation_stack import NavigationStack
+from utils.renderer import Renderer
 
 
 # ── module-level helper (no GL imports needed) ────────────────────────────
@@ -517,6 +518,18 @@ class World:
                         self.load_directory(path, push_nav=False)
 
             elif event.type == MOUSEBUTTONDOWN and event.button in (1, 3):
+                if event.button == 1 and self.cursor_visible:
+                    if Renderer._nav_back_rect and Renderer._nav_back_rect.collidepoint(event.pos):
+                        path = self.nav_stack.go_back()
+                        if path:
+                            self.load_directory(path, push_nav=False)
+                        continue
+                    if Renderer._nav_forward_rect and Renderer._nav_forward_rect.collidepoint(event.pos):
+                        path = self.nav_stack.go_forward()
+                        if path:
+                            self.load_directory(path, push_nav=False)
+                        continue
+
                 if self.bookmarks_panel_visible:
                     record = self._bookmark_record_at_pos(event.pos, *win_size)
                     if record is None:

@@ -19,6 +19,10 @@ class Renderer:
 
     _label_texture_id = None
     _label_text = None
+
+    # Pygame-coordinate rects for the nav arrow hit areas (updated each frame)
+    _nav_back_rect = None
+    _nav_forward_rect = None
     _label_size = (0, 0)
 
     _info_panel_texture_id = None
@@ -216,6 +220,11 @@ class Renderer:
         x0 = margin
         y0 = win_h - margin - total_h
         x1, y1 = x0 + total_w, y0 + total_h
+
+        # Store pygame-coordinate hit rects for click detection (y=0 at top)
+        split_x = x0 + pad + bw + gap // 2
+        Renderer._nav_back_rect    = pygame.Rect(x0, margin, split_x - x0, total_h)
+        Renderer._nav_forward_rect = pygame.Rect(split_x, margin, x1 - split_x, total_h)
 
         glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
         glOrtho(0, win_w, 0, win_h, -1, 1)
