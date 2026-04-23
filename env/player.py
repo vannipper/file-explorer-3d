@@ -11,7 +11,7 @@ from utils.camera_animation_stack import CameraAnimation, CameraAnimationStack
 class Player:
     """Manages player camera and input handling."""
 
-    NAVIGATION_DURATION = 0.5   # seconds for folder-enter transitions
+    NAVIGATION_DURATION = 0.5
 
     def __init__(self, config, fullscreen_toggle=None):
         self.config = config
@@ -66,8 +66,7 @@ class Player:
         self.animation_stack.clear()
         self.animation_stack.push(anim)
 
-    def update(self, dt):
-        # Advance any active animation and apply its state to the camera.
+    def update(self, dt, win_w=None, win_h=None):
         result = self.animation_stack.update(dt)
         if result is not None:
             pos, yaw, pitch = result
@@ -76,8 +75,11 @@ class Player:
             self.camera.pitch = pitch
 
         if not pygame.mouse.get_visible():
-            cx = pygame.display.get_surface().get_width() // 2
-            cy = pygame.display.get_surface().get_height() // 2
+            if win_w is not None and win_h is not None:
+                cx, cy = win_w // 2, win_h // 2
+            else:
+                surf = pygame.display.get_surface()
+                cx, cy = surf.get_width() // 2, surf.get_height() // 2
 
             if not self.animation_stack.is_animating():
                 keys = pygame.key.get_pressed()
@@ -93,7 +95,6 @@ class Player:
                 if up:
                     self.camera.y += up * speed
 
-            # Keep cursor centred so mouse-look has no jump when control returns.
             pygame.mouse.set_pos(cx, cy)
 
     def apply_look(self):

@@ -30,6 +30,8 @@ if __name__ == "__main__":
     world.load_bookmarks_from_config()
 
     win_w, win_h = EngineInitializer.InitializeOpenGLWindow(config)
+    _surf = pygame.display.get_surface()
+    win_w, win_h = _surf.get_width(), _surf.get_height()
 
     if world.bookmarks_panel_visible:
         world.cursor_visible = True
@@ -60,7 +62,7 @@ if __name__ == "__main__":
             config.set('window_height', logical_h)
             config.save()
 
-        player.update(dt)
+        player.update(dt, win_w, win_h)
         world.update()
 
         # Rendering
