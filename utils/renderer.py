@@ -37,6 +37,10 @@ class Renderer:
     _hover_tooltip_text = None
     _hover_tooltip_size = (0, 0)
 
+    _loading_badge_texture_id = None
+    _loading_badge_text = None
+    _loading_badge_size = (0, 0)
+
     # ── directory preview palette (mirrors file_object.py) ─────────────────
     _EXT_COLORS = {
         ".py":   (0.2, 0.9, 0.3),  ".js":   (0.9, 0.85, 0.2),
@@ -684,6 +688,30 @@ class Renderer:
                 if px is not None:
                     Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
                 glDeleteTextures([tex])
+
+    @staticmethod
+    def DrawLoadingBadge(message, win_w, win_h):
+        text = message or "Loading..."
+        cache_text = f"[loading]{text}"
+
+        if cache_text != Renderer._loading_badge_text:
+            Renderer._loading_badge_text = cache_text
+            size_buf = [0, 0]
+
+            if Renderer._loading_badge_texture_id is not None:
+                glDeleteTextures([Renderer._loading_badge_texture_id])
+
+            Renderer._loading_badge_texture_id = Renderer._upload_single_line_texture(text, size_buf)
+            Renderer._loading_badge_size = tuple(size_buf)
+
+        if Renderer._loading_badge_texture_id is None:
+            return
+
+        lw, lh = Renderer._loading_badge_size
+        margin = 18
+        x0 = win_w - lw - margin
+        y0 = win_h - lh - margin
+        Renderer._draw_textured_quad(Renderer._loading_badge_texture_id, x0, y0, lw, lh, win_w, win_h)
 
     # ------------------------------------------------------------------
     # Private helpers

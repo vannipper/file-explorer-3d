@@ -30,16 +30,18 @@ if __name__ == "__main__":
         pygame.mouse.set_visible(True)
         pygame.event.set_grab(False)
 
-    world.load_directory(FileManager.resolve_startup_directory(config))
+    world.request_directory_load(FileManager.resolve_startup_directory(config), new_root=True)
 
     run = True
     while run:
         dt = clock.tick(60) / 1000.0
         events = pygame.event.get()
 
-        new_folder = FileManager.handle_events(events, world.current_directory, config)
+        new_folder = None
+        if not world.is_loading:
+            new_folder = FileManager.handle_events(events, world.current_directory, config)
         if new_folder:
-            world.load_directory(new_folder, new_root=True)
+            world.request_directory_load(new_folder, new_root=True)
 
         run = player.handle_events(events)
         world.handle_events(events)
@@ -68,6 +70,8 @@ if __name__ == "__main__":
         Renderer.DrawNavArrows(world.nav_stack, win_w, win_h)
         Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
         Renderer.DrawBookmarksPanel(world, win_w, win_h)
+        if world.is_loading:
+            Renderer.DrawLoadingBadge(world.loading_message, win_w, win_h)
         if world.selected_object:
             meta = world.metadata_cache.get(world.selected_object.file_path)
             Renderer.DrawInfoPanel(world.selected_object, meta, win_w, win_h)
@@ -84,6 +88,7 @@ if __name__ == "__main__":
         Renderer.DrawCrosshair(win_w, win_h)
 
         pygame.display.flip()
+        world.process_pending_directory_load()
 
     world.sync_bookmarks_to_config()
     pygame.quit()

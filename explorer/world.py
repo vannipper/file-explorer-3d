@@ -120,6 +120,10 @@ class World:
         self._symlink_refresh_thread: threading.Thread | None = None
         self._symlink_refresh_lock = threading.Lock()
 
+        self.is_loading = False
+        self.loading_message: str | None = None
+        self._pending_navigation_request: dict | None = None
+
     # ── object management ────────────────────────────────────────────────────
 
     def add_object(self, obj):
@@ -255,7 +259,7 @@ class World:
             return False
 
         if os.path.isdir(target_path):
-            self.load_directory(target_path)
+            self.request_directory_load(target_path)
             return True
 
         if os.path.exists(target_path):
@@ -263,8 +267,7 @@ class World:
             if not parent:
                 obj.flash_error()
                 return False
-            self.load_directory(parent)
-            self.selected_object = self.get_object_by_path(target_path)
+            self.request_directory_load(parent, focus_path=target_path)
             return True
 
         obj.flash_error()
@@ -272,13 +275,12 @@ class World:
 
     def open_bookmark(self, full_path, is_dir):
         if is_dir:
-            self.load_directory(full_path)
+            self.request_directory_load(full_path)
             return
 
         parent = os.path.dirname(full_path)
         if parent:
-            self.load_directory(parent)
-            self.selected_object = self.get_object_by_path(full_path)
+            self.request_directory_load(parent, focus_path=full_path)
 
     def open_symlink_record(self, record):
         source_path = record.get("source_path")
@@ -291,17 +293,60 @@ class World:
             return False
 
         if os.path.isdir(target_path):
-            self.load_directory(target_path)
+            self.request_directory_load(target_path)
             return True
 
         if os.path.exists(target_path):
             parent = os.path.dirname(target_path)
             if parent:
-                self.load_directory(parent)
-                self.selected_object = self.get_object_by_path(target_path)
+                self.request_directory_load(parent, focus_path=target_path)
                 return True
 
         return False
+
+    def request_directory_load(self, path, push_nav=True, new_root=False, focus_path=None, message="Loading..."):
+        if not path or self.is_loading:
+            return False
+
+        self.is_loading = True
+        self.loading_message = message
+        self._pending_navigation_request = {
+            "path": path,
+            "push_nav": push_nav,
+            "new_root": new_root,
+            "focus_path": focus_path,
+        }
+
+        self._last_clicked_object = None
+        self._last_click_time = 0
+        return True
+
+    def process_pending_directory_load(self):
+        request = self._pending_navigation_request
+        if request is None:
+            return False
+
+        self._pending_navigation_request = None
+        path = request.get("path")
+        push_nav = request.get("push_nav", True)
+        new_root = request.get("new_root", False)
+        focus_path = request.get("focus_path")
+
+        try:
+            self.load_directory(path, push_nav=push_nav, new_root=new_root)
+            if focus_path:
+                self.selected_object = self.get_object_by_path(focus_path)
+        finally:
+            self.is_loading = False
+            self.loading_message = None
+            self._clear_navigation_event_queue()
+
+        return True
+
+    def _clear_navigation_event_queue(self):
+        pygame.event.clear(MOUSEBUTTONDOWN)
+        pygame.event.clear(MOUSEBUTTONUP)
+        pygame.event.clear(KEYDOWN)
 
     def load_directory(self, path, push_nav=True, new_root=False):
         node = make_root(path)
@@ -619,6 +664,10 @@ class World:
         surface = pygame.display.get_surface()
         win_size = surface.get_size() if surface else (0, 0)
         for event in events:
+            if self.is_loading:
+                if event.type in (MOUSEBUTTONDOWN, MOUSEBUTTONUP, KEYDOWN):
+                    continue
+
             if event.type == KEYDOWN and event.key == K_ESCAPE:
                 self.cursor_visible = not self.cursor_visible
                 self.bookmarks_panel_visible = self.cursor_visible
@@ -660,23 +709,23 @@ class World:
                 if event.key == K_BACKSPACE or (event.key == K_LEFT and alt):
                     path = self.nav_stack.go_back()
                     if path:
-                        self.load_directory(path, push_nav=False)
+                        self.request_directory_load(path, push_nav=False)
                 elif event.key == K_RIGHT and alt:
                     path = self.nav_stack.go_forward()
                     if path:
-                        self.load_directory(path, push_nav=False)
+                        self.request_directory_load(path, push_nav=False)
 
             elif event.type == MOUSEBUTTONDOWN and event.button in (1, 3):
                 if event.button == 1 and self.cursor_visible:
                     if Renderer._nav_back_rect and Renderer._nav_back_rect.collidepoint(event.pos):
                         path = self.nav_stack.go_back()
                         if path:
-                            self.load_directory(path, push_nav=False)
+                            self.request_directory_load(path, push_nav=False)
                         continue
                     if Renderer._nav_forward_rect and Renderer._nav_forward_rect.collidepoint(event.pos):
                         path = self.nav_stack.go_forward()
                         if path:
-                            self.load_directory(path, push_nav=False)
+                            self.request_directory_load(path, push_nav=False)
                         continue
 
                 if self.bookmarks_panel_visible:
@@ -718,7 +767,7 @@ class World:
                             if getattr(target, "is_link", False):
                                 self._follow_link_target(target)
                             elif hasattr(target, 'is_dir') and target.is_dir:
-                                self.load_directory(target.file_path)
+                                self.request_directory_load(target.file_path)
                             self._last_clicked_object = None
                             self._last_click_time = 0
                             continue
