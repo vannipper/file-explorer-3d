@@ -67,11 +67,27 @@ python main.py
 ## Build Release Executable (Maintainers)
 Release binaries are distributed through GitHub Releases and are not committed to this repository (`build/` and `dist/` are ignored).
 
-From project root in PowerShell:
+From project root on Windows, run the wrapper script (recommended):
+
+```cmd
+build_windows.cmd
+```
+
+This uses defaults (`AppName=FileExplorer3D`, `Version=dev`) and avoids most PowerShell execution-policy issues on internet-downloaded files.
+
+Optional custom version:
+
+```cmd
+build_windows.cmd -Version v0.1.0
+```
+
+Or from PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build_windows.ps1 -Version v0.1.0
 ```
+
+Note: running `.\build_windows.ps1` directly can still be blocked on some systems by execution policy or Group Policy.
 
 This creates:
 - App folder: `dist\FileExplorer3D`
