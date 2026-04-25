@@ -41,6 +41,10 @@ class Renderer:
     _loading_badge_text = None
     _loading_badge_size = (0, 0)
 
+    _shortcuts_popup_texture_id = None
+    _shortcuts_popup_cache_key = None
+    _shortcuts_popup_size = (0, 0)
+
     # ── directory preview palette (mirrors file_object.py) ─────────────────
     _EXT_COLORS = {
         ".py":   (0.2, 0.9, 0.3),  ".js":   (0.9, 0.85, 0.2),
@@ -709,6 +713,71 @@ class Renderer:
         x0 = win_w - lw - margin
         y0 = win_h - lh - margin
         Renderer._draw_textured_quad(Renderer._loading_badge_texture_id, x0, y0, lw, lh, win_w, win_h)
+
+    @staticmethod
+    def DrawShortcutsPopup(visible, win_w, win_h):
+        if not visible:
+            return
+
+        lines = [
+            "Keyboard + Mouse Shortcuts",
+            "F1: Toggle this help popup",
+            "Esc / Ctrl+B: Toggle cursor mode / bookmarks panel",
+            "Ctrl+O: Open folder",
+            "Ctrl+D: Add or remove bookmark for selected item",
+            "Delete: Remove bookmark under cursor",
+            "Alt+Left or Backspace: Navigate back",
+            "Alt+Right: Navigate forward",
+            "Mouse Side Button 6: Navigate back",
+            "Mouse Side Button 7: Navigate forward",
+            "Left Click (panel): Open selected bookmark/symlink",
+            "Right Click (panel bookmark): Remove bookmark",
+            "W A S D: Move camera",
+            "Space / Left Shift: Move up / down",
+            "Mouse Move (cursor hidden): Look around",
+        ]
+
+        panel_max_w = min(780, max(380, win_w - 80))
+        cache_key = "|".join(lines) + f"|maxw={panel_max_w}"
+        if cache_key != Renderer._shortcuts_popup_cache_key:
+            if Renderer._shortcuts_popup_texture_id is not None:
+                glDeleteTextures([Renderer._shortcuts_popup_texture_id])
+            size_buf = [0, 0]
+            Renderer._shortcuts_popup_texture_id = Renderer._upload_panel_texture(lines, size_buf, max_w=panel_max_w)
+            Renderer._shortcuts_popup_size = tuple(size_buf)
+            Renderer._shortcuts_popup_cache_key = cache_key
+
+        if Renderer._shortcuts_popup_texture_id is None:
+            return
+
+        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
+        glOrtho(0, win_w, 0, win_h, -1, 1)
+        glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity()
+
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_LIGHTING)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        glColor4f(0.0, 0.0, 0.0, 0.62)
+        glBegin(GL_QUADS)
+        glVertex2f(0, 0)
+        glVertex2f(win_w, 0)
+        glVertex2f(win_w, win_h)
+        glVertex2f(0, win_h)
+        glEnd()
+
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+
+        glMatrixMode(GL_PROJECTION); glPopMatrix()
+        glMatrixMode(GL_MODELVIEW); glPopMatrix()
+
+        lw, lh = Renderer._shortcuts_popup_size
+        x0 = max(20, (win_w - lw) // 2)
+        y0 = max(20, (win_h - lh) // 2)
+        Renderer._draw_textured_quad(Renderer._shortcuts_popup_texture_id, x0, y0, lw, lh, win_w, win_h)
 
     # ------------------------------------------------------------------
     # Private helpers

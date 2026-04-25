@@ -13,8 +13,6 @@ from explorer.world import World
 from env.player import Player
 from explorer.selector import Selector
 
-VERSION = "- *Development"
-
 class EngineInitializer:
     """Sets up OS-specific requirements, the window, and OpenGL context."""
 
@@ -40,7 +38,10 @@ class EngineInitializer:
         win_h = config.get('window_height', 720)
 
         pygame.display.set_mode((win_w, win_h), DOUBLEBUF | OPENGL | RESIZABLE)
-        pygame.display.set_caption(f"FileExplorer3D {VERSION}")
+        pygame.display.set_caption("FileExplorer3D")
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        icon_path = os.path.join(project_root, "fileexplorer3d_icon.png")
+        EngineInitializer.setAppIcon(icon_path)
         pygame.mouse.set_visible(False)
         pygame.event.set_grab(True)
 

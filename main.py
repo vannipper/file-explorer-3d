@@ -81,6 +81,7 @@ if __name__ == "__main__":
                 world.hover_preview_name
             )
         Renderer.DrawCrosshair(win_w, win_h)
+        Renderer.DrawShortcutsPopup(world.shortcuts_popup_visible, win_w, win_h)
 
         pygame.display.flip()
         world.process_pending_directory_load()

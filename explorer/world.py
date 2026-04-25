@@ -100,6 +100,7 @@ class World:
         self.bookmarks_panel_visible = True
         self.bookmarks_page_index = 0
         self.symlink_page_index = 0
+        self.shortcuts_popup_visible = False
         self._bookmark_access_cache = {}
 
         self.nav_stack = NavigationStack()
@@ -710,6 +711,10 @@ class World:
         surface = pygame.display.get_surface()
         win_size = surface.get_size() if surface else (0, 0)
         for event in events:
+            if event.type == KEYDOWN and event.key == K_F1:
+                self.shortcuts_popup_visible = not self.shortcuts_popup_visible
+                continue
+
             if self.is_loading:
                 if event.type in (MOUSEBUTTONDOWN, MOUSEBUTTONUP, KEYDOWN):
                     continue
