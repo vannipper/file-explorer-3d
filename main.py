@@ -77,7 +77,6 @@ if __name__ == "__main__":
             Renderer.DrawAxes()
 
         Renderer.DrawNavArrows(world.nav_stack, win_w, win_h)
-        Renderer.DrawSelectedLabel(world.selected_object, win_w, win_h)
         Renderer.DrawBookmarksPanel(world, win_w, win_h)
         if world.selected_object:
             meta = world.metadata_cache.get(world.selected_object.file_path)
