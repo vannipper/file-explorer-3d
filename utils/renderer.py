@@ -30,12 +30,16 @@ class Renderer:
     _info_panel_size = (0, 0)
 
     _bookmark_panel_texture_id = None
-    _bookmark_panel_text = None
+    _bookmark_panel_cache_key = None
     _bookmark_panel_size = (0, 0)
 
     _hover_tooltip_texture_id = None
     _hover_tooltip_text = None
     _hover_tooltip_size = (0, 0)
+
+    _loading_badge_texture_id = None
+    _loading_badge_text = None
+    _loading_badge_size = (0, 0)
 
     # ── directory preview palette (mirrors file_object.py) ─────────────────
     _EXT_COLORS = {
@@ -74,8 +78,9 @@ class Renderer:
         for event in events:
             if event.type == VIDEORESIZE:
                 InteractionHandler.ResizeWindow(*event.size)
-                surf = pygame.display.get_surface()
-                return surf.get_width(), surf.get_height()
+                glViewport(0, 0, event.size[0], event.size[1])
+                viewport = glGetIntegerv(GL_VIEWPORT)
+                return int(viewport[2]), int(viewport[3])
         return None
 
     @staticmethod
@@ -113,6 +118,24 @@ class Renderer:
         glTranslatef(obj.x, obj.y, obj.z)
         glMaterialfv(GL_FRONT, GL_EMISSION, [0.0, 0.0, 0.0, 1.0])
         obj.draw(selected=(obj is selected_object), bookmarked=bookmarked)
+
+        # Draw a compact warning glyph above nodes participating in link cycles.
+        if getattr(obj, "in_cycle", False):
+            top_y = obj.height / 2.0 + 0.18
+            glDisable(GL_LIGHTING)
+            glColor3f(1.0, 0.55, 0.1)
+            glLineWidth(2.0)
+            glBegin(GL_LINES)
+            glVertex3f(0.0, top_y + 0.14, 0.0)
+            glVertex3f(0.0, top_y - 0.08, 0.0)
+            glEnd()
+            glPointSize(4.0)
+            glBegin(GL_POINTS)
+            glVertex3f(0.0, top_y - 0.13, 0.0)
+            glEnd()
+            glLineWidth(1.0)
+            glEnable(GL_LIGHTING)
+
         glPopMatrix()
 
     @staticmethod
@@ -261,6 +284,7 @@ class Renderer:
             return None
 
         records = layout['page_records']
+        symlink_records = layout.get('symlink_records', [])
         panel_rect = layout['panel_rect']
 
         panel_surface = pygame.Surface((panel_rect.width, panel_rect.height), pygame.SRCALPHA)
@@ -345,21 +369,95 @@ class Renderer:
             overflow_text = body_font.render(f"+ {layout['overflow_count']} more bookmarks", True, (190, 200, 220))
             panel_surface.blit(overflow_text, (16, footer_y + 6))
 
-        panel_surface = pygame.transform.flip(panel_surface, False, True)
-        raw = pygame.image.tostring(panel_surface, "RGBA", False)
-        tex_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, tex_id)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, panel_rect.width, panel_rect.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw)
+        symlink_header_rect = layout.get('symlink_header_rect')
+        if symlink_header_rect is not None:
+            symlink_header_rel = symlink_header_rect.move(-panel_rect.x, -panel_rect.y)
+            symlink_title = title_font.render("Symlinks In View", True, (180, 240, 245))
+            panel_surface.blit(symlink_title, (16, symlink_header_rel.y + 2))
 
-        Renderer._bookmark_panel_texture_id = tex_id
-        Renderer._bookmark_panel_text = "|".join(record['path'] for record in records)
-        Renderer._bookmark_panel_size = (panel_rect.width, panel_rect.height)
+            symlink_rows = layout.get('symlink_rows', [])
+            for row in symlink_rows:
+                record = row['record']
+                row_rect = row['rect'].move(-panel_rect.x, -panel_rect.y)
+                pygame.draw.rect(panel_surface, (255, 255, 255, 18), row_rect, border_radius=10)
+
+                badge_rect = pygame.Rect(row_rect.x + 10, row_rect.y + 12, world.BOOKMARK_ICON_SIZE + 6, world.BOOKMARK_ICON_SIZE + 6)
+                pygame.draw.rect(panel_surface, (90, 220, 230), badge_rect, border_radius=6)
+                badge_label = body_font.render("L", True, (20, 24, 32))
+                panel_surface.blit(
+                    badge_label,
+                    (
+                        badge_rect.x + (badge_rect.width - badge_label.get_width()) // 2,
+                        badge_rect.y + (badge_rect.height - badge_label.get_height()) // 2,
+                    ),
+                )
+
+                status_text = None
+                status_color = (190, 200, 220)
+                if record.get('link_broken', False):
+                    status_text = '[BROKEN]'
+                    status_color = (230, 140, 140)
+                elif record.get('is_protected', False):
+                    status_text = '[PROTECTED]'
+                    status_color = (240, 190, 110)
+
+                status_width = 0
+                if status_text:
+                    status_surf = body_font.render(status_text, True, status_color)
+                    status_width = status_surf.get_width() + 12
+                    panel_surface.blit(
+                        status_surf,
+                        (row_rect.right - status_surf.get_width() - 10, row_rect.y + 8),
+                    )
+
+                name_x = badge_rect.right + 10
+                name_max_width = panel_rect.width - name_x - 14 - status_width
+                name_text = Renderer._fit_text(record.get('name', ''), title_font, name_max_width)
+                name_surf = title_font.render(name_text, True, (255, 255, 255))
+                panel_surface.blit(name_surf, (name_x, row_rect.y + 6))
+
+                target_text = Renderer._fit_text(record.get('target_path', ''), body_font, name_max_width)
+                target_surf = body_font.render(target_text, True, (190, 200, 220))
+                panel_surface.blit(target_surf, (name_x, row_rect.y + 28))
+
+            if not symlink_records:
+                empty_rect = layout.get('symlink_empty_rect')
+                if empty_rect is not None:
+                    empty_rel = empty_rect.move(-panel_rect.x, -panel_rect.y)
+                    empty_surf = body_font.render("No symlinks in view", True, (190, 200, 220))
+                    panel_surface.blit(empty_surf, (empty_rel.x, empty_rel.y))
+
+            symlink_overflow = layout.get('symlink_overflow_count', 0)
+            if symlink_overflow > 0:
+                overflow_surf = body_font.render(f"+ {symlink_overflow} more symlinks", True, (190, 200, 220))
+                overflow_y = symlink_header_rel.bottom + len(symlink_rows) * (world.SYMLINK_ROW_HEIGHT + world.SYMLINK_ROW_GAP) + 4
+                panel_surface.blit(overflow_surf, (16, overflow_y))
+
+        cache_key = (
+            "|".join(r['path'] for r in records),
+            "|".join(r['path'] for r in symlink_records),
+            panel_rect.width, panel_rect.height,
+            layout['page_index'], layout['page_count'],
+        )
+
+        if cache_key != Renderer._bookmark_panel_cache_key or Renderer._bookmark_panel_texture_id is None:
+            if Renderer._bookmark_panel_texture_id is not None:
+                glDeleteTextures([Renderer._bookmark_panel_texture_id])
+
+            panel_surface = pygame.transform.flip(panel_surface, False, True)
+            raw = pygame.image.tostring(panel_surface, "RGBA", False)
+            tex_id = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, tex_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, panel_rect.width, panel_rect.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw)
+
+            Renderer._bookmark_panel_texture_id = tex_id
+            Renderer._bookmark_panel_cache_key = cache_key
+            Renderer._bookmark_panel_size = (panel_rect.width, panel_rect.height)
 
         draw_y = win_h - panel_rect.y - panel_rect.height
-        Renderer._draw_textured_quad(tex_id, panel_rect.x, draw_y, panel_rect.width, panel_rect.height, win_w, win_h)
-        glDeleteTextures([tex_id])
+        Renderer._draw_textured_quad(Renderer._bookmark_panel_texture_id, panel_rect.x, draw_y, panel_rect.width, panel_rect.height, win_w, win_h)
         return layout
 
     @staticmethod
@@ -437,6 +535,17 @@ class Renderer:
         lines.append(f"Perms: {meta.permissions}")
         if meta.is_symlink and meta.symlink_target:
             lines.append(f"\u2192 {meta.symlink_target}")
+        if getattr(obj, "is_link", False):
+            link_kind = "shortcut" if getattr(obj, "is_shortcut", False) else "symlink"
+            lines.append(f"Link: {link_kind}")
+            if getattr(obj, "link_target_path", None):
+                lines.append(f"Target: {obj.link_target_path}")
+            if getattr(obj, "link_broken", False):
+                lines.append("[BROKEN LINK]")
+            if getattr(obj, "in_cycle", False):
+                lines.append("[CYCLE WARNING]")
+            if getattr(obj, "link_target_path", None) and not getattr(obj, "link_target_in_view", True):
+                lines.append("Target not visible in this directory view")
 
         panel_max_w = min(420, max(200, win_w // 3))
 
@@ -562,6 +671,30 @@ class Renderer:
                 if px is not None:
                     Renderer._draw_textured_quad(tex, int(px - lw/2), int(py - lh/2), lw, lh, win_w, win_h)
                 glDeleteTextures([tex])
+
+    @staticmethod
+    def DrawLoadingBadge(message, win_w, win_h):
+        text = message or "Loading..."
+        cache_text = f"[loading]{text}"
+
+        if cache_text != Renderer._loading_badge_text:
+            Renderer._loading_badge_text = cache_text
+            size_buf = [0, 0]
+
+            if Renderer._loading_badge_texture_id is not None:
+                glDeleteTextures([Renderer._loading_badge_texture_id])
+
+            Renderer._loading_badge_texture_id = Renderer._upload_single_line_texture(text, size_buf)
+            Renderer._loading_badge_size = tuple(size_buf)
+
+        if Renderer._loading_badge_texture_id is None:
+            return
+
+        lw, lh = Renderer._loading_badge_size
+        margin = 18
+        x0 = win_w - lw - margin
+        y0 = win_h - lh - margin
+        Renderer._draw_textured_quad(Renderer._loading_badge_texture_id, x0, y0, lw, lh, win_w, win_h)
 
     # ------------------------------------------------------------------
     # Private helpers
