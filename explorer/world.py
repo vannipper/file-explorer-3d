@@ -67,12 +67,12 @@ class World:
     BOOKMARK_PANEL_MARGIN = 12
     BOOKMARK_PANEL_TOP = 12
     BOOKMARK_PANEL_BOTTOM = 12
-    BOOKMARK_PANEL_MAX_HEIGHT = 560
+    BOOKMARK_PANEL_MAX_HEIGHT = 900
     BOOKMARK_ROW_HEIGHT = 54
     BOOKMARK_ROW_GAP = 8
     BOOKMARK_ICON_SIZE = 22
     BOOKMARK_HEADER_HEIGHT = 42
-    BOOKMARK_FOOTER_HEIGHT = 38
+    BOOKMARK_FOOTER_HEIGHT = 52
     BOOKMARK_ACCESS_CACHE_TTL = 2.0
     SYMLINK_SECTION_GAP = 10
     SYMLINK_HEADER_HEIGHT = 34
@@ -99,6 +99,7 @@ class World:
         self.bookmarks = DoublyLinkedList()
         self.bookmarks_panel_visible = True
         self.bookmarks_page_index = 0
+        self.symlink_page_index = 0
         self._bookmark_access_cache = {}
 
         self.nav_stack = NavigationStack()
@@ -140,6 +141,7 @@ class World:
         self._last_clicked_object = None
         self._symlink_record_cache = None
         self._symlink_refresh_thread = None
+        self.symlink_page_index = 0
 
     def get_object_by_path(self, file_path):
         return self.object_by_path.get(file_path)
@@ -158,31 +160,27 @@ class World:
     def get_bookmark_entries(self):
         return self.bookmarks.to_records()
 
-    def get_bookmark_page_size(self, win_h):
-        available_height = min(
-            self.BOOKMARK_PANEL_MAX_HEIGHT,
-            max(180, win_h - self.BOOKMARK_PANEL_TOP - self.BOOKMARK_PANEL_BOTTOM),
-        )
-        usable_height = max(0, available_height - self.BOOKMARK_HEADER_HEIGHT - self.BOOKMARK_FOOTER_HEIGHT)
-        row_stride = self.BOOKMARK_ROW_HEIGHT + self.BOOKMARK_ROW_GAP
-        return max(1, usable_height // row_stride)
+    def get_bookmark_page_size(self):
+        return 4
 
-    def get_bookmark_page_count(self, win_h):
-        page_size = self.get_bookmark_page_size(win_h)
+    def get_bookmark_page_count(self):
+        page_size = self.get_bookmark_page_size()
         total = len(self.bookmarks)
         return max(1, (total + page_size - 1) // page_size)
 
-    def get_bookmark_page_entries(self, win_h):
+
+
+    def get_bookmark_page_entries(self):
         entries = self.get_bookmark_entries()
-        page_size = self.get_bookmark_page_size(win_h)
-        page_count = max(1, (len(entries) + page_size - 1) // page_size)
+        page_size = self.get_bookmark_page_size()
+        page_count = self.get_bookmark_page_count()
         self.bookmarks_page_index = max(0, min(self.bookmarks_page_index, page_count - 1))
         start = self.bookmarks_page_index * page_size
         end = start + page_size
         return entries[start:end], page_size, page_count
 
-    def next_bookmark_page(self, win_h):
-        page_count = self.get_bookmark_page_count(win_h)
+    def next_bookmark_page(self):
+        page_count = self.get_bookmark_page_count()
         if self.bookmarks_page_index < page_count - 1:
             self.bookmarks_page_index += 1
 
@@ -190,9 +188,40 @@ class World:
         if self.bookmarks_page_index > 0:
             self.bookmarks_page_index -= 1
 
-    def _clamp_bookmark_page(self, win_h):
-        page_count = self.get_bookmark_page_count(win_h)
+    def _clamp_bookmark_page(self):
+        page_count = self.get_bookmark_page_count()
         self.bookmarks_page_index = max(0, min(self.bookmarks_page_index, page_count - 1))
+
+    def get_symlink_page_size(self):
+        return 4
+
+    def get_symlink_page_count(self):
+        symlink_records_all = self._get_visible_symlink_records()
+        page_size = self.get_symlink_page_size()
+        total = len(symlink_records_all)
+        return max(1, (total + page_size - 1) // page_size)
+
+    def get_symlink_page_entries(self):
+        symlink_records_all = self._get_visible_symlink_records()
+        page_size = self.get_symlink_page_size()
+        page_count = self.get_symlink_page_count()
+        self.symlink_page_index = max(0, min(self.symlink_page_index, page_count - 1))
+        start = self.symlink_page_index * page_size
+        end = start + page_size
+        return symlink_records_all[start:end], page_size, page_count
+
+    def next_symlink_page(self):
+        page_count = self.get_symlink_page_count()
+        if self.symlink_page_index < page_count - 1:
+            self.symlink_page_index += 1
+
+    def previous_symlink_page(self):
+        if self.symlink_page_index > 0:
+            self.symlink_page_index -= 1
+
+    def _clamp_symlink_page(self):
+        page_count = self.get_symlink_page_count()
+        self.symlink_page_index = max(0, min(self.symlink_page_index, page_count - 1))
 
     def sync_bookmarks_to_config(self):
         if not self.config:
@@ -493,14 +522,13 @@ class World:
         if not self.bookmarks_panel_visible:
             return None
 
-        page_records, page_size, page_count = self.get_bookmark_page_entries(win_h)
+        page_records, page_size, page_count = self.get_bookmark_page_entries()
         display_records = []
         for record in page_records:
             flags = self._get_bookmark_access_flags(record['path'], record['is_dir'])
             display_records.append({**record, **flags, 'kind': 'bookmark'})
 
-        symlink_records_all = self._get_visible_symlink_records()
-        symlink_records = symlink_records_all[:self.SYMLINK_MAX_ROWS]
+        symlink_records, symlink_page_size, symlink_page_count = self.get_symlink_page_entries()
 
         panel_width = min(self.BOOKMARK_PANEL_WIDTH, max(300, win_w - 2 * self.BOOKMARK_PANEL_MARGIN))
         max_height = min(
@@ -524,6 +552,7 @@ class World:
             + self.SYMLINK_SECTION_GAP
             + self.SYMLINK_HEADER_HEIGHT
             + symlink_body_height
+            + 52  # space for symlink footer controls + page indicator row
             + 20
         )
         panel_height = min(max_height, panel_content_height)
@@ -540,7 +569,7 @@ class World:
         footer_y = y + self.BOOKMARK_HEADER_HEIGHT + rows_height + 4
         prev_rect = pygame.Rect(x + 12, footer_y, 72, 26)
         next_rect = pygame.Rect(x + panel_width - 84, footer_y, 72, 26)
-        page_text_rect = pygame.Rect(x + 92, footer_y, panel_width - 184, 26)
+        page_text_rect = pygame.Rect(x + 92, footer_y + 28, panel_width - 184, 20)
 
         symlink_header_top = footer_y + self.BOOKMARK_FOOTER_HEIGHT + self.SYMLINK_SECTION_GAP
         symlink_header_rect = pygame.Rect(x, symlink_header_top, panel_width, self.SYMLINK_HEADER_HEIGHT)
@@ -553,6 +582,11 @@ class World:
             symlink_rows.append({'record': record, 'rect': row_rect, 'index': index})
 
         symlink_empty_rect = pygame.Rect(x + 16, symlink_row_start_y + 8, panel_width - 32, 24)
+
+        symlink_footer_y = symlink_row_start_y + symlink_rows_height + 4
+        symlink_prev_rect = pygame.Rect(x + 12, symlink_footer_y, 72, 26)
+        symlink_next_rect = pygame.Rect(x + panel_width - 84, symlink_footer_y, 72, 26)
+        symlink_page_text_rect = pygame.Rect(x + 92, symlink_footer_y + 28, panel_width - 184, 20)
 
         return {
             'panel_rect': pygame.Rect(x, y, panel_width, panel_height),
@@ -572,7 +606,14 @@ class World:
             'symlink_rows': symlink_rows,
             'symlink_records': symlink_records,
             'symlink_empty_rect': symlink_empty_rect,
-            'symlink_overflow_count': max(0, len(symlink_records_all) - len(symlink_records)),
+            'symlink_page_count': symlink_page_count,
+            'symlink_page_index': self.symlink_page_index,
+            'symlink_page_size': symlink_page_size,
+            'symlink_has_prev': self.symlink_page_index > 0,
+            'symlink_has_next': self.symlink_page_index < symlink_page_count - 1,
+            'symlink_prev_rect': symlink_prev_rect,
+            'symlink_next_rect': symlink_next_rect,
+            'symlink_page_text_rect': symlink_page_text_rect,
         }
 
     def _bookmark_record_at_pos(self, pos, win_w, win_h):
@@ -588,6 +629,11 @@ class World:
         for row in layout['rows']:
             if row['rect'].collidepoint(pos):
                 return row['record']
+
+        if layout['symlink_has_prev'] and layout['symlink_prev_rect'].collidepoint(pos):
+            return {'action': 'symlink_prev'}
+        if layout['symlink_has_next'] and layout['symlink_next_rect'].collidepoint(pos):
+            return {'action': 'symlink_next'}
 
         for row in layout.get('symlink_rows', []):
             if row['rect'].collidepoint(pos):
@@ -700,7 +746,7 @@ class World:
                     if record.get('action') == 'prev':
                         self.previous_bookmark_page()
                     elif record.get('action') == 'next':
-                        self.next_bookmark_page(win_size[1])
+                        self.next_bookmark_page()
                     elif record.get('kind') == 'bookmark':
                         self.remove_bookmark(record['path'])
 
@@ -715,7 +761,18 @@ class World:
                     if path:
                         self.request_directory_load(path, push_nav=False)
 
-            elif event.type == MOUSEBUTTONDOWN and event.button in (1, 3):
+            elif event.type == MOUSEBUTTONDOWN:
+                if event.button == 6:  # Mouse back button
+                    path = self.nav_stack.go_back()
+                    if path:
+                        self.request_directory_load(path, push_nav=False)
+                        continue
+                elif event.button == 7:  # Mouse forward button
+                    path = self.nav_stack.go_forward()
+                    if path:
+                        self.request_directory_load(path, push_nav=False)
+                        continue
+                
                 if event.button == 1 and self.cursor_visible:
                     if Renderer._nav_back_rect and Renderer._nav_back_rect.collidepoint(event.pos):
                         path = self.nav_stack.go_back()
@@ -738,7 +795,15 @@ class World:
                         continue
 
                     if isinstance(record, dict) and record.get('action') == 'next':
-                        self.next_bookmark_page(win_size[1])
+                        self.next_bookmark_page()
+                        continue
+
+                    if isinstance(record, dict) and record.get('action') == 'symlink_prev':
+                        self.previous_symlink_page()
+                        continue
+
+                    if isinstance(record, dict) and record.get('action') == 'symlink_next':
+                        self.next_symlink_page()
                         continue
 
                     if record.get('kind') == 'symlink':

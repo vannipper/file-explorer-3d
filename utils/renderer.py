@@ -347,7 +347,6 @@ class Renderer:
             path_surf = body_font.render(path_text, True, (190, 200, 220))
             panel_surface.blit(path_surf, (name_x, row_rect.y + 28))
 
-        footer_y = panel_rect.height - world.BOOKMARK_FOOTER_HEIGHT + 6
         if layout['page_count'] > 1:
             prev_color = (255, 255, 255) if layout['has_prev'] else (90, 96, 110)
             next_color = (255, 255, 255) if layout['has_next'] else (90, 96, 110)
@@ -364,10 +363,11 @@ class Renderer:
             panel_surface.blit(next_surf, (next_rect.x + (next_rect.width - next_surf.get_width()) // 2, next_rect.y + 6))
 
             page_text = body_font.render(f"{layout['page_index'] + 1} / {layout['page_count']}", True, (190, 200, 220))
-            panel_surface.blit(page_text, (page_text_rect.x + (page_text_rect.width - page_text.get_width()) // 2, footer_y + 6))
+            panel_surface.blit(page_text, (page_text_rect.x + (page_text_rect.width - page_text.get_width()) // 2, page_text_rect.y + 2))
         elif layout['overflow_count'] > 0:
             overflow_text = body_font.render(f"+ {layout['overflow_count']} more bookmarks", True, (190, 200, 220))
-            panel_surface.blit(overflow_text, (16, footer_y + 6))
+            page_text_rect = layout['page_text_rect'].move(-panel_rect.x, -panel_rect.y)
+            panel_surface.blit(overflow_text, (16, page_text_rect.y + 2))
 
         symlink_header_rect = layout.get('symlink_header_rect')
         if symlink_header_rect is not None:
@@ -427,17 +427,31 @@ class Renderer:
                     empty_surf = body_font.render("No symlinks in view", True, (190, 200, 220))
                     panel_surface.blit(empty_surf, (empty_rel.x, empty_rel.y))
 
-            symlink_overflow = layout.get('symlink_overflow_count', 0)
-            if symlink_overflow > 0:
-                overflow_surf = body_font.render(f"+ {symlink_overflow} more symlinks", True, (190, 200, 220))
-                overflow_y = symlink_header_rel.bottom + len(symlink_rows) * (world.SYMLINK_ROW_HEIGHT + world.SYMLINK_ROW_GAP) + 4
-                panel_surface.blit(overflow_surf, (16, overflow_y))
+            symlink_page_count = layout.get('symlink_page_count', 1)
+            if symlink_page_count > 1:
+                symlink_prev_color = (255, 255, 255) if layout.get('symlink_has_prev') else (90, 96, 110)
+                symlink_next_color = (255, 255, 255) if layout.get('symlink_has_next') else (90, 96, 110)
+
+                symlink_prev_rect = layout.get('symlink_prev_rect').move(-panel_rect.x, -panel_rect.y)
+                symlink_next_rect = layout.get('symlink_next_rect').move(-panel_rect.x, -panel_rect.y)
+                symlink_page_text_rect = layout.get('symlink_page_text_rect').move(-panel_rect.x, -panel_rect.y)
+
+                pygame.draw.rect(panel_surface, (255, 255, 255, 24), symlink_prev_rect, border_radius=8)
+                pygame.draw.rect(panel_surface, (255, 255, 255, 24), symlink_next_rect, border_radius=8)
+                symlink_prev_surf = body_font.render("Prev", True, symlink_prev_color)
+                symlink_next_surf = body_font.render("Next", True, symlink_next_color)
+                panel_surface.blit(symlink_prev_surf, (symlink_prev_rect.x + (symlink_prev_rect.width - symlink_prev_surf.get_width()) // 2, symlink_prev_rect.y + 6))
+                panel_surface.blit(symlink_next_surf, (symlink_next_rect.x + (symlink_next_rect.width - symlink_next_surf.get_width()) // 2, symlink_next_rect.y + 6))
+
+                symlink_page_text = body_font.render(f"{layout.get('symlink_page_index', 0) + 1} / {symlink_page_count}", True, (190, 200, 220))
+                panel_surface.blit(symlink_page_text, (symlink_page_text_rect.x + (symlink_page_text_rect.width - symlink_page_text.get_width()) // 2, symlink_page_text_rect.y + 2))
 
         cache_key = (
             "|".join(r['path'] for r in records),
             "|".join(r['path'] for r in symlink_records),
             panel_rect.width, panel_rect.height,
             layout['page_index'], layout['page_count'],
+            layout.get('symlink_page_index', 0), layout.get('symlink_page_count', 1),
         )
 
         if cache_key != Renderer._bookmark_panel_cache_key or Renderer._bookmark_panel_texture_id is None:
