@@ -4,10 +4,19 @@ A 3D File Explorer app that uses the Zenith 3D engine to allow the user to trave
 ## Install (Windows)
 No Python installation is required for end users.
 
-1. Open the latest release on GitHub and download the Windows zip file named like `FileExplorer3D-windows-vX.Y.Z.zip`.
-2. Right-click the zip and extract it to a folder (for example, Desktop or Program Files).
-3. Open the extracted `FileExplorer3D` folder.
-4. Run `FileExplorer3D.exe`.
+1. Open the repository on GitHub, download the source code zip from the `main` branch, and extract it.
+2. Open PowerShell in the extracted project root.
+3. Build the app:
+
+```powershell
+.\build_windows.cmd
+```
+
+4. Run the generated app:
+
+```powershell
+.\dist\FileExplorer3D\FileExplorer3D.exe
+```
 
 ## Install (macOS / Linux)
 
@@ -26,18 +35,18 @@ conda activate FileExplorer3D
 python main.py
 ```
 
-### Option B: Use a Release Archive (if provided)
-1. Download the archive for your platform from GitHub Releases (for example `FileExplorer3D-linux-vX.Y.Z.tar.gz` or `FileExplorer3D-darwin-vX.Y.Z.tar.gz`).
-2. Extract it:
+### Option B: Build a Native Binary From Source
+1. Open a Bash shell in the extracted project root and run:
 
 ```bash
-tar -xzf FileExplorer3D-<platform>-vX.Y.Z.tar.gz
+chmod +x ./build_unix.sh
+./build_unix.sh
 ```
 
-3. Open the extracted folder and run the app binary:
+2. Open the generated folder and run the app binary:
 
 ```bash
-cd FileExplorer3D
+cd dist/FileExplorer3D
 ./FileExplorer3D
 ```
 
@@ -64,88 +73,5 @@ To run the project, run:
 python main.py
 ```
 
-## Build Release Executable (Maintainers)
-Release binaries are distributed through GitHub Releases and are not committed to this repository (`build/` and `dist/` are ignored).
-
-From project root on Windows, run the wrapper script (recommended):
-
-```cmd
-build_windows.cmd
-```
-
-This uses defaults (`AppName=FileExplorer3D`, `Version=dev`) and avoids most PowerShell execution-policy issues on internet-downloaded files.
-
-Optional custom version:
-
-```cmd
-build_windows.cmd -Version v0.1.0
-```
-
-Or from PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build_windows.ps1 -Version v0.1.0
-```
-
-Note: running `.\build_windows.ps1` directly can still be blocked on some systems by execution policy or Group Policy.
-
-This creates:
-- App folder: `dist\FileExplorer3D`
-- Release zip: `dist\FileExplorer3D-windows-v0.1.0.zip`
-
-Upload the zip file to the corresponding GitHub Release.
-
-### Build macOS/Linux release archive
-From project root in a Unix shell:
-
-```bash
-chmod +x ./build_unix.sh
-./build_unix.sh FileExplorer3D v0.1.0
-```
-
-This creates:
-- App folder: `dist/FileExplorer3D`
-- Release archive: `dist/FileExplorer3D-<platform>-v0.1.0.tar.gz`
-
-Upload the archive file to the corresponding GitHub Release.
-
 ## Algorithm Implementations
 The following section describes each of the units involved in the Python version of the **SSE 554** course and how content from each unit is used
-
-### Directed Graph for Symlinks and Shortcuts
-
-The explorer builds a directed graph while directories are explored to represent
-symlink/shortcut relationships:
-
-- Nodes are absolute file/folder paths.
-- Directed edges represent link direction: source path -> resolved target path.
-
-Why directed: links have one-way semantics. Path A linking to path B does not
-imply B links back to A. Treating this as an undirected graph would lose that
-information.
-
-Representation:
-
-- `adjacency: dict[str, list[str]]` for forward lookup.
-- `reverse_adjacency: dict[str, list[str]]` for reverse lookup.
-
-Complexity:
-
-- `add_edge()`: O(1) amortized.
-- `get_targets()` / `get_sources()`: O(1) lookup + O(k) output size.
-- `detect_cycles()`: O(V + E) via DFS coloring.
-- `get_connected_component()`: O(V + E) via BFS/DFS.
-- Storage: O(V + E).
-
-Implementation notes:
-
-- Symlinks use `os.path.islink(path)` and `os.path.realpath(path)`.
-- Windows `.lnk` shortcuts are resolved at discovery time.
-- Broken links are preserved in the graph and flagged so they can be rendered
-	as warnings without breaking traversal.
-
-## Shortcuts
-
-- `Ctrl+D`: bookmark the selected item, or the current directory if nothing is selected
-- `Ctrl+B`: toggle the bookmarks panel
-- `Delete`: remove a bookmark from the bookmarks panel
