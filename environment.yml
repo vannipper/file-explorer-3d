@@ -12,3 +12,4 @@ dependencies:
     - pygame
     - PyOpenGL
     - PyOpenGL_accelerate
+    - pyinstaller
