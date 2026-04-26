@@ -73,12 +73,14 @@ class World:
     BOOKMARK_ICON_SIZE = 22
     BOOKMARK_HEADER_HEIGHT = 42
     BOOKMARK_FOOTER_HEIGHT = 52
+    BOOKMARK_PAGE_SIZE = 4
     BOOKMARK_ACCESS_CACHE_TTL = 2.0
     SYMLINK_SECTION_GAP = 10
     SYMLINK_HEADER_HEIGHT = 34
     SYMLINK_ROW_HEIGHT = 54
     SYMLINK_ROW_GAP = 8
-    SYMLINK_MAX_ROWS = 4
+    SYMLINK_PAGE_SIZE = 4
+    SYMLINK_FOOTER_HEIGHT = 52
     SYMLINK_RECORD_CACHE_TTL = 2.0
 
     def __init__(self):
@@ -162,14 +164,12 @@ class World:
         return self.bookmarks.to_records()
 
     def get_bookmark_page_size(self):
-        return 4
+        return self.BOOKMARK_PAGE_SIZE
 
     def get_bookmark_page_count(self):
         page_size = self.get_bookmark_page_size()
         total = len(self.bookmarks)
         return max(1, (total + page_size - 1) // page_size)
-
-
 
     def get_bookmark_page_entries(self):
         entries = self.get_bookmark_entries()
@@ -194,7 +194,7 @@ class World:
         self.bookmarks_page_index = max(0, min(self.bookmarks_page_index, page_count - 1))
 
     def get_symlink_page_size(self):
-        return 4
+        return self.SYMLINK_PAGE_SIZE
 
     def get_symlink_page_count(self):
         symlink_records_all = self._get_visible_symlink_records()
@@ -205,7 +205,8 @@ class World:
     def get_symlink_page_entries(self):
         symlink_records_all = self._get_visible_symlink_records()
         page_size = self.get_symlink_page_size()
-        page_count = self.get_symlink_page_count()
+        total = len(symlink_records_all)
+        page_count = max(1, (total + page_size - 1) // page_size)
         self.symlink_page_index = max(0, min(self.symlink_page_index, page_count - 1))
         start = self.symlink_page_index * page_size
         end = start + page_size
@@ -553,7 +554,7 @@ class World:
             + self.SYMLINK_SECTION_GAP
             + self.SYMLINK_HEADER_HEIGHT
             + symlink_body_height
-            + 52  # space for symlink footer controls + page indicator row
+            + self.SYMLINK_FOOTER_HEIGHT
             + 20
         )
         panel_height = min(max_height, panel_content_height)

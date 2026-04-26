@@ -60,8 +60,12 @@ if __name__ == "__main__":
         Renderer.SetupFrame(win_w, win_h, config)
         player.apply_look()
 
+        if config.get('show_grid', True):
+            Renderer.DrawGrid()
         for obj in world.objects:
             Renderer.DrawObject(obj, world.selected_object, world.is_bookmarked(obj.file_path))
+        if config.get('show_axes', True):
+            Renderer.DrawAxes()
 
         Renderer.DrawNavArrows(world.nav_stack, win_w, win_h)
         Renderer.DrawBookmarksPanel(world, win_w, win_h)
