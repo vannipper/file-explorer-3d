@@ -2,3 +2,6 @@
 config.json
 **/.vscode
 **/.github
+
+# pytest
+.pytest_cache/
