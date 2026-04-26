@@ -47,3 +47,9 @@ coll = COLLECT(
     upx_exclude=[],
     name='FileExplorer3D',
 )
+app = BUNDLE(
+    coll,
+    name='FileExplorer3D.app',
+    icon='fileexplorer3d_icon.png',
+    bundle_identifier=None,
+)
