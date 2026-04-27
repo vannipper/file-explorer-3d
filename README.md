@@ -9,7 +9,7 @@ No Python installation is required for end users.
 3. Build the app:
 
 ```powershell
-.\build_windows.cmd
+powershell.exe -ExecutionPolicy Bypass -File .\build_windows.ps1
 ```
 
 4. Run the generated app:
