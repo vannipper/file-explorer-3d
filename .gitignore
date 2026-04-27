@@ -13,3 +13,5 @@ dist/
 # pytest
 .pytest_cache/
 test_results.txt
+
+.DS_Store
