@@ -41,6 +41,10 @@ class Renderer:
     _loading_badge_text = None
     _loading_badge_size = (0, 0)
 
+    _shortcuts_popup_texture_id = None
+    _shortcuts_popup_cache_key = None
+    _shortcuts_popup_size = (0, 0)
+
     # ── directory preview palette (mirrors file_object.py) ─────────────────
     _EXT_COLORS = {
         ".py":   (0.2, 0.9, 0.3),  ".js":   (0.9, 0.85, 0.2),
@@ -347,7 +351,6 @@ class Renderer:
             path_surf = body_font.render(path_text, True, (190, 200, 220))
             panel_surface.blit(path_surf, (name_x, row_rect.y + 28))
 
-        footer_y = panel_rect.height - world.BOOKMARK_FOOTER_HEIGHT + 6
         if layout['page_count'] > 1:
             prev_color = (255, 255, 255) if layout['has_prev'] else (90, 96, 110)
             next_color = (255, 255, 255) if layout['has_next'] else (90, 96, 110)
@@ -364,10 +367,11 @@ class Renderer:
             panel_surface.blit(next_surf, (next_rect.x + (next_rect.width - next_surf.get_width()) // 2, next_rect.y + 6))
 
             page_text = body_font.render(f"{layout['page_index'] + 1} / {layout['page_count']}", True, (190, 200, 220))
-            panel_surface.blit(page_text, (page_text_rect.x + (page_text_rect.width - page_text.get_width()) // 2, footer_y + 6))
+            panel_surface.blit(page_text, (page_text_rect.x + (page_text_rect.width - page_text.get_width()) // 2, page_text_rect.y + 2))
         elif layout['overflow_count'] > 0:
             overflow_text = body_font.render(f"+ {layout['overflow_count']} more bookmarks", True, (190, 200, 220))
-            panel_surface.blit(overflow_text, (16, footer_y + 6))
+            page_text_rect = layout['page_text_rect'].move(-panel_rect.x, -panel_rect.y)
+            panel_surface.blit(overflow_text, (16, page_text_rect.y + 2))
 
         symlink_header_rect = layout.get('symlink_header_rect')
         if symlink_header_rect is not None:
@@ -427,17 +431,31 @@ class Renderer:
                     empty_surf = body_font.render("No symlinks in view", True, (190, 200, 220))
                     panel_surface.blit(empty_surf, (empty_rel.x, empty_rel.y))
 
-            symlink_overflow = layout.get('symlink_overflow_count', 0)
-            if symlink_overflow > 0:
-                overflow_surf = body_font.render(f"+ {symlink_overflow} more symlinks", True, (190, 200, 220))
-                overflow_y = symlink_header_rel.bottom + len(symlink_rows) * (world.SYMLINK_ROW_HEIGHT + world.SYMLINK_ROW_GAP) + 4
-                panel_surface.blit(overflow_surf, (16, overflow_y))
+            symlink_page_count = layout.get('symlink_page_count', 1)
+            if symlink_page_count > 1:
+                symlink_prev_color = (255, 255, 255) if layout.get('symlink_has_prev') else (90, 96, 110)
+                symlink_next_color = (255, 255, 255) if layout.get('symlink_has_next') else (90, 96, 110)
+
+                symlink_prev_rect = layout.get('symlink_prev_rect').move(-panel_rect.x, -panel_rect.y)
+                symlink_next_rect = layout.get('symlink_next_rect').move(-panel_rect.x, -panel_rect.y)
+                symlink_page_text_rect = layout.get('symlink_page_text_rect').move(-panel_rect.x, -panel_rect.y)
+
+                pygame.draw.rect(panel_surface, (255, 255, 255, 24), symlink_prev_rect, border_radius=8)
+                pygame.draw.rect(panel_surface, (255, 255, 255, 24), symlink_next_rect, border_radius=8)
+                symlink_prev_surf = body_font.render("Prev", True, symlink_prev_color)
+                symlink_next_surf = body_font.render("Next", True, symlink_next_color)
+                panel_surface.blit(symlink_prev_surf, (symlink_prev_rect.x + (symlink_prev_rect.width - symlink_prev_surf.get_width()) // 2, symlink_prev_rect.y + 6))
+                panel_surface.blit(symlink_next_surf, (symlink_next_rect.x + (symlink_next_rect.width - symlink_next_surf.get_width()) // 2, symlink_next_rect.y + 6))
+
+                symlink_page_text = body_font.render(f"{layout.get('symlink_page_index', 0) + 1} / {symlink_page_count}", True, (190, 200, 220))
+                panel_surface.blit(symlink_page_text, (symlink_page_text_rect.x + (symlink_page_text_rect.width - symlink_page_text.get_width()) // 2, symlink_page_text_rect.y + 2))
 
         cache_key = (
             "|".join(r['path'] for r in records),
             "|".join(r['path'] for r in symlink_records),
             panel_rect.width, panel_rect.height,
             layout['page_index'], layout['page_count'],
+            layout.get('symlink_page_index', 0), layout.get('symlink_page_count', 1),
         )
 
         if cache_key != Renderer._bookmark_panel_cache_key or Renderer._bookmark_panel_texture_id is None:
@@ -695,6 +713,71 @@ class Renderer:
         x0 = win_w - lw - margin
         y0 = win_h - lh - margin
         Renderer._draw_textured_quad(Renderer._loading_badge_texture_id, x0, y0, lw, lh, win_w, win_h)
+
+    @staticmethod
+    def DrawShortcutsPopup(visible, win_w, win_h):
+        if not visible:
+            return
+
+        lines = [
+            "Keyboard + Mouse Shortcuts",
+            "F1: Toggle this help popup",
+            "Esc / Ctrl+B: Toggle cursor mode / bookmarks panel",
+            "Ctrl+O: Open folder",
+            "Ctrl+D: Add or remove bookmark for selected item",
+            "Delete: Remove bookmark under cursor",
+            "Alt+Left or Backspace: Navigate back",
+            "Alt+Right: Navigate forward",
+            "Mouse Side Button 6: Navigate back",
+            "Mouse Side Button 7: Navigate forward",
+            "Left Click (panel): Open selected bookmark/symlink",
+            "Right Click (panel bookmark): Remove bookmark",
+            "W A S D: Move camera",
+            "Space / Left Shift: Move up / down",
+            "Mouse Move (cursor hidden): Look around",
+        ]
+
+        panel_max_w = min(780, max(380, win_w - 80))
+        cache_key = "|".join(lines) + f"|maxw={panel_max_w}"
+        if cache_key != Renderer._shortcuts_popup_cache_key:
+            if Renderer._shortcuts_popup_texture_id is not None:
+                glDeleteTextures([Renderer._shortcuts_popup_texture_id])
+            size_buf = [0, 0]
+            Renderer._shortcuts_popup_texture_id = Renderer._upload_panel_texture(lines, size_buf, max_w=panel_max_w)
+            Renderer._shortcuts_popup_size = tuple(size_buf)
+            Renderer._shortcuts_popup_cache_key = cache_key
+
+        if Renderer._shortcuts_popup_texture_id is None:
+            return
+
+        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
+        glOrtho(0, win_w, 0, win_h, -1, 1)
+        glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity()
+
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_LIGHTING)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        glColor4f(0.0, 0.0, 0.0, 0.62)
+        glBegin(GL_QUADS)
+        glVertex2f(0, 0)
+        glVertex2f(win_w, 0)
+        glVertex2f(win_w, win_h)
+        glVertex2f(0, win_h)
+        glEnd()
+
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+
+        glMatrixMode(GL_PROJECTION); glPopMatrix()
+        glMatrixMode(GL_MODELVIEW); glPopMatrix()
+
+        lw, lh = Renderer._shortcuts_popup_size
+        x0 = max(20, (win_w - lw) // 2)
+        y0 = max(20, (win_h - lh) // 2)
+        Renderer._draw_textured_quad(Renderer._shortcuts_popup_texture_id, x0, y0, lw, lh, win_w, win_h)
 
     # ------------------------------------------------------------------
     # Private helpers

@@ -3,6 +3,15 @@ config.json
 **/.vscode
 **/.github
 
+# PyInstaller build artifacts (do not commit)
+build/
+dist/
+
+# Local packaging byproducts
+*.zip
+*.tar.gz
 # pytest
 .pytest_cache/
 test_results.txt
+
+.DS_Store
