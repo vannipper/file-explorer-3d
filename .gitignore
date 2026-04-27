@@ -10,3 +10,6 @@ dist/
 # Local packaging byproducts
 *.zip
 *.tar.gz
+# pytest
+.pytest_cache/
+test_results.txt
