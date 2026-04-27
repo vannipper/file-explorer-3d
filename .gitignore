@@ -5,3 +5,4 @@ config.json
 
 # pytest
 .pytest_cache/
+test_results.txt
