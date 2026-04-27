@@ -20,6 +20,11 @@ $venvPython = Join-Path $envDir "Scripts\python.exe"
 Write-Host "Installing PyInstaller and dependencies..."
 & $venvPython -m pip install --upgrade pip --quiet
 & $venvPython -m pip install pyinstaller --quiet
+& $venvPython -m pip install Pillow --quiet
+& $venvPython -m pip install pygame --quiet
+
+# Added PyOpenGL because main.py imports it!
+& $venvPython -m pip install PyOpenGL --quiet 
 
 Write-Host "Building $AppName ($Version) ..."
 
@@ -31,22 +36,12 @@ Write-Host "Building $AppName ($Version) ..."
 
 $distDir = Join-Path $projectRoot "dist"
 $appDir = Join-Path $distDir $AppName
-$zipPath = Join-Path $distDir ("{0}-windows-{1}.zip" -f $AppName, $Version)
 
 if (-Not (Test-Path $appDir)) {
     Write-Host "`nWARNING: The output directory '$appDir' was not found." -ForegroundColor Yellow
     Write-Host "This usually means PyInstaller crashed (scroll up to check for missing icons or modules)." -ForegroundColor Yellow
-    Write-Host "Creating an empty directory so the zip process doesn't fail...`n" -ForegroundColor Yellow
-    
-    New-Item -ItemType Directory -Force -Path $appDir | Out-Null
+    exit
 }
 
-if (Test-Path $zipPath) {
-    Remove-Item $zipPath -Force
-}
-
-Write-Host "Zipping the release..."
-Compress-Archive -Path $appDir -DestinationPath $zipPath -Force
-
-Write-Host "Build complete: $appDir"
-Write-Host "Release zip: $zipPath"
+Write-Host "`nBuild complete!" -ForegroundColor Green
+Write-Host "Your executable and files are ready at: $appDir"
