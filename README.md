@@ -2,17 +2,17 @@
 A 3D File Explorer app that uses the Zenith 3D engine to allow the user to traverse through a designated file structure.
 
 ## Install (Windows)
-No Python installation is required for end users.
+1. Install [Anaconda or Miniconda](https://www.anaconda.com/download).
 
-1. Open the repository on GitHub, download the source code zip from the `main` branch, and extract it.
-2. Open PowerShell in the extracted project root.
-3. Build the app:
+2. Open the repository on GitHub, download the source code zip from the `main` branch, and extract it.
+3. Open PowerShell in the extracted project root.
+4. Build the app:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\build_windows.ps1
 ```
 
-4. Run the generated app:
+5. Run the generated app:
 
 ```powershell
 .\dist\FileExplorer3D\FileExplorer3D.exe
