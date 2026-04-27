@@ -9,7 +9,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('img', 'img')],
+    datas=[],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -36,7 +36,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['fileexplorer3d_icon.png'],
+    icon=['fileexplorer3d_icon.icns'],
 )
 coll = COLLECT(
     exe,
@@ -50,6 +50,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='FileExplorer3D.app',
-    icon='fileexplorer3d_icon.png',
+    icon='fileexplorer3d_icon.icns',
     bundle_identifier=None,
 )

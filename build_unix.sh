@@ -12,7 +12,7 @@ echo "Building $APP_NAME ($VERSION) ..."
 # Build a windowed app and intentionally do NOT bundle config files.
 pyinstaller --noconfirm --clean --windowed \
   --name "$APP_NAME" \
-  --icon fileexplorer3d_icon.png \
+  --icon fileexplorer3d_icon.icns \
   --collect-submodules OpenGL \
   main.py
 
