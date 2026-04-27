@@ -15,7 +15,6 @@ pyinstaller --noconfirm --clean --windowed `
     --name $AppName `
     --icon fileexplorer3d_icon.png `
     --collect-submodules OpenGL `
-    --add-data "img;img" `
     main.py
 
 $distDir = Join-Path $projectRoot "dist"

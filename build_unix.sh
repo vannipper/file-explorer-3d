@@ -14,7 +14,6 @@ pyinstaller --noconfirm --clean --windowed \
   --name "$APP_NAME" \
   --icon fileexplorer3d_icon.png \
   --collect-submodules OpenGL \
-  --add-data "img:img" \
   main.py
 
 DIST_DIR="$PROJECT_ROOT/dist"
