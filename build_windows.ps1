@@ -21,15 +21,11 @@ Write-Host "Installing PyInstaller and dependencies..."
 & $venvPython -m pip install --upgrade pip --quiet
 & $venvPython -m pip install pyinstaller --quiet
 
-# Uncomment this if your app needs specific libraries to run!
-# & $venvPython -m pip install -r requirements.txt --quiet
-
 Write-Host "Building $AppName ($Version) ..."
 
-# Run the build
 & $venvPython -m PyInstaller --noconfirm --clean --windowed `
     --name $AppName `
-    --icon fileexplorer3d_icon.png `
+    --icon fileexplorer3d_icon.ico `
     --collect-submodules OpenGL `
     main.py
 
@@ -37,13 +33,11 @@ $distDir = Join-Path $projectRoot "dist"
 $appDir = Join-Path $distDir $AppName
 $zipPath = Join-Path $distDir ("{0}-windows-{1}.zip" -f $AppName, $Version)
 
-# --- NEW DIRECTORY CHECK & CREATION ---
 if (-Not (Test-Path $appDir)) {
     Write-Host "`nWARNING: The output directory '$appDir' was not found." -ForegroundColor Yellow
     Write-Host "This usually means PyInstaller crashed (scroll up to check for missing icons or modules)." -ForegroundColor Yellow
     Write-Host "Creating an empty directory so the zip process doesn't fail...`n" -ForegroundColor Yellow
     
-    # -Force tells PowerShell to automatically create parent folders (like \dist\) if they are missing too
     New-Item -ItemType Directory -Force -Path $appDir | Out-Null
 }
 
